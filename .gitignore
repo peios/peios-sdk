@@ -1,0 +1,9 @@
+# Build artifacts
+/target/
+
+# Library crate: the consuming cdylib owns the resolved lockfile.
+Cargo.lock
+
+# Project tooling
+.cairn/
+.pm/
