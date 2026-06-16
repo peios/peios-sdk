@@ -58,7 +58,14 @@ pub unsafe fn emit_str(s: &[u8], out: *mut c_char, cap: usize) -> isize {
         set_errno(libc::EINVAL);
         return -1;
     }
-    if cap < need + 1 {
+    // A real write needs room for the NUL too. Guard the `need + 1` against the
+    // (degenerate, unreachable for a real slice) overflow so it can never wrap
+    // the comparison into a spurious success.
+    let Some(needed) = need.checked_add(1) else {
+        set_errno(libc::ERANGE);
+        return -1;
+    };
+    if cap < needed {
         set_errno(libc::ERANGE);
         return -1;
     }
@@ -183,4 +190,146 @@ pub unsafe fn cstr_bytes<'a>(ptr: *const c_char, max: usize) -> Option<&'a [u8]>
         len += 1;
     }
     None
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::error::{get_errno, set_errno};
+
+    // ---- emit_bytes: the getxattr probe / EINVAL / ERANGE / copy contract ----
+
+    #[test]
+    fn emit_bytes_probe_reports_len_and_writes_nothing() {
+        // cap == 0 is a probe: returns src.len(), tolerates a NULL out.
+        let src = [1u8, 2, 3, 4];
+        assert_eq!(unsafe { emit_bytes(&src, core::ptr::null_mut(), 0) }, 4);
+    }
+
+    #[test]
+    fn emit_bytes_null_out_with_capacity_is_einval() {
+        set_errno(0);
+        let src = [1u8, 2, 3];
+        assert_eq!(unsafe { emit_bytes(&src, core::ptr::null_mut(), 8) }, -1);
+        assert_eq!(get_errno(), libc::EINVAL);
+    }
+
+    #[test]
+    fn emit_bytes_too_small_is_erange_and_never_truncates() {
+        set_errno(0);
+        let src = [9u8, 9, 9, 9];
+        let mut buf = [0u8; 3];
+        assert_eq!(unsafe { emit_bytes(&src, buf.as_mut_ptr(), buf.len()) }, -1);
+        assert_eq!(get_errno(), libc::ERANGE);
+        assert_eq!(buf, [0, 0, 0]); // nothing written
+    }
+
+    #[test]
+    fn emit_bytes_exact_and_oversized_copy_all() {
+        let src = [1u8, 2, 3, 4];
+        let mut exact = [0u8; 4];
+        assert_eq!(unsafe { emit_bytes(&src, exact.as_mut_ptr(), 4) }, 4);
+        assert_eq!(exact, src);
+        let mut over = [0u8; 8];
+        assert_eq!(unsafe { emit_bytes(&src, over.as_mut_ptr(), 8) }, 4);
+        assert_eq!(&over[..4], &src);
+    }
+
+    #[test]
+    fn emit_bytes_empty_source() {
+        let src: [u8; 0] = [];
+        assert_eq!(unsafe { emit_bytes(&src, core::ptr::null_mut(), 0) }, 0);
+        let mut buf = [7u8; 2];
+        assert_eq!(unsafe { emit_bytes(&src, buf.as_mut_ptr(), 2) }, 0);
+        assert_eq!(buf, [7, 7]);
+    }
+
+    // ---- emit_str: same contract, plus the NUL terminator accounting ----
+
+    #[test]
+    fn emit_str_probe_excludes_nul() {
+        assert_eq!(unsafe { emit_str(b"hello", core::ptr::null_mut(), 0) }, 5);
+    }
+
+    #[test]
+    fn emit_str_needs_room_for_the_terminator() {
+        set_errno(0);
+        let mut buf = [0u8; 3]; // exactly len, no room for the NUL
+        assert_eq!(
+            unsafe { emit_str(b"abc", buf.as_mut_ptr() as *mut c_char, buf.len()) },
+            -1
+        );
+        assert_eq!(get_errno(), libc::ERANGE);
+    }
+
+    #[test]
+    fn emit_str_writes_and_nul_terminates_without_overrun() {
+        let mut buf = [0xAAu8; 5];
+        assert_eq!(
+            unsafe { emit_str(b"abc", buf.as_mut_ptr() as *mut c_char, buf.len()) },
+            3
+        );
+        assert_eq!(&buf[..3], b"abc");
+        assert_eq!(buf[3], 0); // NUL at `need`
+        assert_eq!(buf[4], 0xAA); // byte past the NUL is untouched
+    }
+
+    #[test]
+    fn emit_str_null_out_with_capacity_is_einval() {
+        set_errno(0);
+        assert_eq!(unsafe { emit_str(b"x", core::ptr::null_mut(), 4) }, -1);
+        assert_eq!(get_errno(), libc::EINVAL);
+    }
+
+    #[test]
+    fn emit_str_empty_needs_one_byte_for_the_nul() {
+        assert_eq!(unsafe { emit_str(b"", core::ptr::null_mut(), 0) }, 0);
+        let mut buf = [0xAAu8; 1];
+        assert_eq!(unsafe { emit_str(b"", buf.as_mut_ptr() as *mut c_char, 1) }, 0);
+        assert_eq!(buf[0], 0);
+    }
+
+    // ---- u32_len: the boundary narrowing ----
+
+    #[test]
+    fn u32_len_passes_in_range_and_rejects_over() {
+        assert_eq!(u32_len(0), Ok(0));
+        assert_eq!(u32_len(u32::MAX as usize), Ok(u32::MAX));
+        #[cfg(target_pointer_width = "64")]
+        assert_eq!(u32_len((u32::MAX as usize) + 1), Err(libc::EINVAL));
+    }
+
+    // ---- cstr_bytes: bounded scan ----
+
+    #[test]
+    fn cstr_bytes_stops_at_nul() {
+        let buf = b"hi\0rest";
+        let got = unsafe { cstr_bytes(buf.as_ptr() as *const c_char, buf.len()) };
+        assert_eq!(got, Some(&b"hi"[..]));
+    }
+
+    #[test]
+    fn cstr_bytes_empty_string() {
+        let buf = b"\0";
+        assert_eq!(
+            unsafe { cstr_bytes(buf.as_ptr() as *const c_char, 1) },
+            Some(&b""[..])
+        );
+    }
+
+    #[test]
+    fn cstr_bytes_unterminated_within_max_is_none() {
+        let buf = b"abcd"; // no NUL in the first 4 bytes
+        assert_eq!(unsafe { cstr_bytes(buf.as_ptr() as *const c_char, 4) }, None);
+    }
+
+    #[test]
+    fn cstr_bytes_finds_nul_at_last_scanned_index() {
+        // Indices 0..max are scanned; a NUL at index max-1 is found.
+        let buf = b"abc\0";
+        assert_eq!(
+            unsafe { cstr_bytes(buf.as_ptr() as *const c_char, 4) },
+            Some(&b"abc"[..])
+        );
+    }
 }
