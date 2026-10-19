@@ -222,8 +222,8 @@
         "bzlTransitiveDigest": "W7X3ezRodXH6aC6uEvRv+t2hsBrp+ylHtQL7If6MXrc=",
         "usagesDigest": "JPb6flRw/PJXjTgRbKHKDec5JSjwnqnkZjJQfoSrl9A=",
         "recordedFileInputs": {
-          "@@//Cargo.lock": "bd28eff7c4cd02454ebca19b6fad65e405f5487938fa0c2752613bace2474a97",
-          "@@//Cargo.toml": "001f2212017fca824dc5c638e4a3c8cd6b95f4db9a9fede22af2e9ce1a87822e",
+          "@@//Cargo.lock": "05623c27321dde8ad6d6f1318714acbd687c45e22aefb7c7ec06c73652a1580c",
+          "@@//Cargo.toml": "6b5451914ba81bf3285287581135a0f380d2274d95262c8c250bd61576fff2ac",
           "@@//libpeios/Cargo.toml": "916163bdbc7825133f707c9d0eb85ed41ad9f5e13b0afe4eda5248bf91237e3a",
           "@@//librsi/Cargo.toml": "4bd61f20393ab85b650c9bac556ecdaaec89a5706803d60390f31bd38a756873",
           "@@//peios-cabi/Cargo.toml": "a671dee244ca24ebb268384e7bf97b50cc07dbfa5e192cb3340a9204569acd8b",

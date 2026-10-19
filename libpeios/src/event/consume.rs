@@ -24,9 +24,10 @@
 
 #![allow(non_camel_case_types)]
 
+use alloc::vec::Vec;
 use core::ffi::{c_char, c_int, c_long, c_void};
 use core::slice;
-use core::sync::atomic::{AtomicU32, AtomicU64, AtomicU8, Ordering};
+use core::sync::atomic::{fence, AtomicU32, AtomicU64, AtomicU8, Ordering};
 
 use peios_uapi::{
     KMES_CONSUMER_NEED_WAKE_OFFSET, KMES_EVENT_HEADER_BASE_SIZE, KMES_MAPPING_CONSUMER_OFFSET,
@@ -93,7 +94,12 @@ struct EventFields {
 /// contiguous bytes). Mirrors the kernel's layout and the spec's corruption
 /// guards (`event_size > 0`, `event_size >= header_size`, `header_size == 77 +
 /// type_len`, the whole event within bounds, and `event_size <= capacity`).
+#[cfg(test)]
 fn parse_event(w: &[u8], capacity: u64) -> Option<EventFields> {
+    parse_event_header(w, capacity, w.len())
+}
+
+fn parse_event_header(w: &[u8], capacity: u64, available: usize) -> Option<EventFields> {
     if w.len() < HEADER_BASE {
         return None;
     }
@@ -109,7 +115,7 @@ fn parse_event(w: &[u8], capacity: u64) -> Option<EventFields> {
     if header_size as usize != HEADER_BASE + type_len {
         return None;
     }
-    if (event_size as usize) > w.len() {
+    if (event_size as usize) > available {
         return None;
     }
     let payload_off = header_size as usize;
@@ -134,9 +140,9 @@ fn parse_event(w: &[u8], capacity: u64) -> Option<EventFields> {
 // ----------------------------------------------------------------------------
 
 /// A parsed event. The kernel-stamped header fields are copied by value; the
-/// `event_type` and `payload` pointers borrow into the ring mapping and are valid
-/// only until the next `next()` / read advance (and only if the slot has not been
-/// overwritten). Mirrors `struct peios_event`.
+/// `event_type` and `payload` pointers refer to a reader-owned snapshot for the
+/// high-level reader, or the live mapping for low-level ring access. See each
+/// accessor for its lifetime and overwrite contract. Mirrors `struct peios_event`.
 #[repr(C)]
 pub struct peios_event {
     pub timestamp: u64,
@@ -172,6 +178,33 @@ struct Ring {
     base: *mut u8,
     capacity: u64,
     map_len: usize,
+}
+
+/// Copy bytes owned by the external producer without borrowing its storage.
+///
+/// # Safety
+/// `source` must remain mapped and readable for `destination.len()` bytes.
+unsafe fn copy_shared(source: *const u8, destination: &mut [u8]) {
+    for (offset, byte) in destination.iter_mut().enumerate() {
+        *byte = source.add(offset).read_volatile();
+    }
+}
+
+/// Populate the C view from validated fields and storage that outlives its use.
+unsafe fn fill_event(fields: &EventFields, base: *const u8, out: *mut peios_event) {
+    if let Some(out) = out.as_mut() {
+        out.timestamp = fields.timestamp;
+        out.sequence = fields.sequence;
+        out.cpu_id = fields.cpu_id;
+        out.origin_class = fields.origin_class;
+        out.effective_token_guid = fields.eff_guid;
+        out.true_token_guid = fields.true_guid;
+        out.process_guid = fields.proc_guid;
+        out.event_type = base.add(fields.type_off).cast();
+        out.event_type_len = fields.type_len as u16;
+        out.payload = base.add(fields.payload_off).cast();
+        out.payload_len = fields.payload_len as u32;
+    }
 }
 
 /// What a futex/poll wait concluded.
@@ -246,22 +279,63 @@ impl Ring {
         // From the event start to the end of the (double-mapped) data region.
         let avail = self.map_len - META_TOTAL - off;
         let evstart = self.data().add(off);
-        let w = slice::from_raw_parts(evstart, avail);
-        let f = parse_event(w, self.capacity)?;
-        if let Some(out) = out.as_mut() {
-            out.timestamp = f.timestamp;
-            out.sequence = f.sequence;
-            out.cpu_id = f.cpu_id;
-            out.origin_class = f.origin_class;
-            out.effective_token_guid = f.eff_guid;
-            out.true_token_guid = f.true_guid;
-            out.process_guid = f.proc_guid;
-            out.event_type = evstart.add(f.type_off) as *const c_char;
-            out.event_type_len = f.type_len as u16;
-            out.payload = evstart.add(f.payload_off) as *const c_void;
-            out.payload_len = f.payload_len as u32;
+        if avail < HEADER_BASE {
+            return None;
         }
-        Some(u64::from(f.event_size))
+        // The producer may overwrite the mapping. Never form a Rust slice
+        // over mutable shared bytes, even while only reading the header.
+        let mut header = [0u8; HEADER_BASE];
+        copy_shared(evstart, &mut header);
+        let fields = parse_event_header(&header, self.capacity, avail)?;
+        fill_event(&fields, evstart, out);
+        Some(u64::from(fields.event_size))
+    }
+
+    /// Copy a complete published event and reject overwrites during the copy.
+    unsafe fn snapshot(&self, position: u64, bytes: &mut Vec<u8>) -> Result<EventFields, c_int> {
+        self.snapshot_with(position, bytes, || {})
+    }
+
+    // The hook makes producer interleavings deterministic in regression tests.
+    unsafe fn snapshot_with(
+        &self,
+        position: u64,
+        bytes: &mut Vec<u8>,
+        after_copy: impl FnOnce(),
+    ) -> Result<EventFields, c_int> {
+        let generation = self.generation();
+        let write = self.write_pos();
+        if position < self.tail_pos() || position >= write {
+            return Err(libc::EAGAIN);
+        }
+        let offset = (position & (self.capacity - 1)) as usize;
+        let available = self.map_len - META_TOTAL - offset;
+        if available < HEADER_BASE || self.capacity < HEADER_BASE as u64 {
+            return Err(libc::EINVAL);
+        }
+        let start = self.data().add(offset);
+        let mut header = [0u8; HEADER_BASE];
+        copy_shared(start, &mut header);
+        let published = usize::try_from(write - position).unwrap_or(usize::MAX);
+        let fields = parse_event_header(&header, self.capacity, available.min(published))
+            .ok_or(libc::EINVAL)?;
+        let size = fields.event_size as usize;
+        bytes.clear();
+        bytes.try_reserve(size).map_err(|_| libc::ENOMEM)?;
+        bytes.resize(size, 0);
+        copy_shared(start, bytes);
+        after_copy();
+        // Complete shared reads before checking whether the producer invalidated
+        // this slot. The kernel publishes its tail before overwriting data.
+        fence(Ordering::Acquire);
+        if position < self.tail_pos() || self.generation() != generation {
+            return Err(libc::EAGAIN);
+        }
+        let copied = parse_event_header(bytes, self.capacity, bytes.len()).ok_or(libc::EINVAL)?;
+        if copied.event_size != fields.event_size {
+            return Err(libc::EAGAIN);
+        }
+        Ok(copied)
     }
 
     /// Block until events past `read_pos` may be available, or the timeout fires.
@@ -654,6 +728,7 @@ pub struct peios_event_reader {
     last_seq: u64,
     lost: u64,
     generation: u64,
+    snapshot: Vec<u8>,
 }
 
 /// Attach + map CPU `cpu_id`, starting the read position at the oldest surviving
@@ -713,30 +788,25 @@ impl peios_event_reader {
                 self.read_pos = tail; // lapped — skip to the oldest survivor
                 continue;
             }
-            let saved_tail = tail;
-            let Some(size) = self.ring.event_at(self.read_pos, out) else {
-                // Corrupt slot: resynchronise to the tail if the producer has moved
-                // on. If the tail is still this position, retrying would spin forever.
-                let tail = self.ring.tail_pos();
-                if tail <= self.read_pos {
-                    return Err(libc::EINVAL);
+            let fields = match self.ring.snapshot(self.read_pos, &mut self.snapshot) {
+                Ok(fields) => fields,
+                Err(errno) => {
+                    let tail = self.ring.tail_pos();
+                    if tail > self.read_pos || self.ring.generation() != self.generation {
+                        self.read_pos = tail;
+                        continue;
+                    }
+                    return Err(errno);
                 }
-                self.read_pos = tail;
-                continue;
             };
-            // Torn-read guard: if the tail advanced past us while we read, the
-            // bytes may have been overwritten — discard and retry.
-            let tail2 = self.ring.tail_pos();
-            if tail2 > saved_tail && self.read_pos < tail2 {
-                continue;
-            }
+            fill_event(&fields, self.snapshot.as_ptr(), out);
             if let Some(out) = out.as_ref() {
                 if self.last_seq != 0 && out.sequence > self.last_seq + 1 {
                     self.lost += out.sequence - self.last_seq - 1;
                 }
                 self.last_seq = out.sequence;
             }
-            self.read_pos += size;
+            self.read_pos += u64::from(fields.event_size);
             return Ok(true);
         }
     }
@@ -766,6 +836,7 @@ pub unsafe extern "C" fn peios_event_reader_open(cpu_id: u32) -> *mut peios_even
         last_seq: 0,
         lost: 0,
         generation: gen,
+        snapshot: Vec::new(),
     });
     if reader.is_null() {
         ring.unmap();
@@ -793,7 +864,8 @@ pub unsafe extern "C" fn peios_event_reader_close(reader: *mut peios_event_reade
 /// `peios_event_reader_next` — fetch the next event into `out`. Returns 1 (event
 /// filled), 0 (none available — consider `peios_event_reader_wait`), or `-1` with
 /// errno. Lapping, sequence-gap loss, and buffer resizes are handled internally;
-/// the `out` pointers are valid until the next call.
+/// the `out` pointers refer to reader-owned storage until the next call or close.
+/// The producer cannot mutate a returned snapshot.
 ///
 /// # Safety
 /// `reader` must be open; `out` must be writable.
@@ -952,6 +1024,7 @@ mod tests {
                 last_seq: 0,
                 lost: 0,
                 generation: 1,
+                snapshot: Vec::new(),
             }
         }
     }
@@ -1122,6 +1195,62 @@ mod tests {
                 &payload
             );
         }
+    }
+
+    #[test]
+    fn reader_snapshot_survives_producer_overwrite() {
+        let mut fixture = RingFixture::new(1024);
+        let original = event(1, 10, 0, 0, b"old", &[1]);
+        fixture.write_event(0, &original);
+        fixture.set_positions(0, original.len() as u64);
+        let mut reader = fixture.reader(0);
+        let mut out = blank_event();
+        // SAFETY: the fixture owns its mapping and reader for this scope.
+        unsafe {
+            assert!(reader.next(&mut out).unwrap());
+            fixture.write_event(0, &event(2, 20, 0, 0, b"new", &[2]));
+            assert_eq!(
+                slice::from_raw_parts(out.event_type.cast::<u8>(), 3),
+                b"old"
+            );
+            assert_eq!(slice::from_raw_parts(out.payload.cast::<u8>(), 1), &[1]);
+        }
+    }
+
+    #[test]
+    fn snapshot_rejects_lapping_or_resize_during_copy() {
+        for resize in [false, true] {
+            let mut fixture = RingFixture::new(1024);
+            let bytes = event(1, 10, 0, 0, b"old", &[1]);
+            fixture.write_event(0, &bytes);
+            fixture.set_positions(0, bytes.len() as u64);
+            let ring = fixture.ring;
+            let mut snapshot = Vec::new();
+            // SAFETY: the fixture owns the mapping. The hook simulates the
+            // producer after copying, before the consumer validates its state.
+            let result = unsafe {
+                ring.snapshot_with(0, &mut snapshot, || {
+                    if resize {
+                        fixture.store_u64(KMES_PRODUCER_GENERATION_OFFSET, 2);
+                    } else {
+                        fixture.set_positions(bytes.len() as u64, bytes.len() as u64);
+                    }
+                })
+            };
+            assert!(matches!(result, Err(libc::EAGAIN)));
+        }
+    }
+
+    #[test]
+    fn snapshot_rejects_unpublished_event_end() {
+        let mut fixture = RingFixture::new(1024);
+        let bytes = event(1, 10, 0, 0, b"a", &[1]);
+        fixture.write_event(0, &bytes);
+        fixture.set_positions(0, bytes.len() as u64 - 1);
+        // SAFETY: the fixture owns a complete mapping; only the published span
+        // is intentionally shorter than the event claims.
+        let result = unsafe { fixture.ring.snapshot(0, &mut Vec::new()) };
+        assert!(matches!(result, Err(libc::EINVAL)));
     }
 
     #[test]

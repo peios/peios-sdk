@@ -130,9 +130,9 @@ int peios_event_policy_enabled(peios_event_policy *policy, const char *event_typ
 
 /*
  * A parsed event. The kernel-stamped header is copied by value; @event_type and
- * @payload point into the ring mapping and are valid only until the next read
- * advance (and only while the slot has not been overwritten — copy out what you
- * need before continuing). @payload is a MessagePack value (see <peios/msgpack.h>).
+ * @payload refer to a reader-owned snapshot for the high-level reader, or the
+ * live mapping for low-level ring access. See each accessor for its lifetime
+ * and overwrite contract. @payload is a MessagePack value (see <peios/msgpack.h>).
  * @origin_class: 0 = userspace, 1 = KMES, 2 = KACS, 3 = LCS.
  */
 struct peios_event {
@@ -188,7 +188,8 @@ void peios_event_reader_close(peios_event_reader *r);
 /*
  * Fetch the next event into @out. Returns 1 (event filled), 0 (none available —
  * consider peios_event_reader_wait), or -1 with errno. The @out pointers are
- * valid only until the next call. @out must be non-NULL.
+ * backed by a reader-owned snapshot, valid until the next read or close.
+ * Kernel overwrites cannot change that snapshot. @out must be non-NULL.
  */
 int peios_event_reader_next(peios_event_reader *r, struct peios_event *out);
 

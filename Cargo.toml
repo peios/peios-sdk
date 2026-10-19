@@ -4,7 +4,7 @@ members = ["libpeios", "librsi", "peios-cabi", "vendor/kernel/peios/rust/kacs-co
 exclude = ["vendor/ppk"]
 
 [workspace.package]
-version = "0.5.11"
+version = "0.5.12"
 edition = "2021"
 rust-version = "1.98.1"
 license = "MIT"

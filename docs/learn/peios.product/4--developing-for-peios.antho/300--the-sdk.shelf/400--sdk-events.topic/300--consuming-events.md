@@ -75,10 +75,10 @@ void handle_event(const struct peios_event *ev)
 
 ### The lifetime rule
 
-`ev->event_type` and `ev->payload` point **into the ring mapping**. They are
-valid only until your next `peios_event_reader_next` call, and only while the
-slot hasn't been overwritten. So **copy out anything you need to keep** before
-continuing the loop — don't stash the raw pointers.
+In libpeios 0.5.12 and later, `ev->event_type` and `ev->payload` point
+into a private reader snapshot. Kernel overwrites cannot change those
+bytes. The pointers remain valid until the next read or reader closure.
+Copy anything you need to retain beyond that lifetime.
 
 ## Draining every CPU
 

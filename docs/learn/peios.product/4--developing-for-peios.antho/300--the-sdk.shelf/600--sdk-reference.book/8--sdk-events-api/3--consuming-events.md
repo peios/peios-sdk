@@ -29,10 +29,11 @@ stamped by the kernel and cannot be forged by the emitter. **`sequence` is
 per-CPU, per-boot monotonic — a gap in it means events were lost**
 (overwritten before you drained them).
 
-> **Lifetime:** `event_type` and `payload` point into the ring mapping and are
-valid **only until the next read advance**, and only while the slot has not
-been overwritten. Copy out whatever you need before continuing to the next
-event.
+> **Lifetime:** The high-level reader in libpeios 0.5.12 and later keeps
+> a private event snapshot until the next read or close. Low-level
+> `peios_event_ring_event_at` pointers still borrow the ring mapping;
+> callers must copy their data and reject slots overwritten during the
+> copy before interpreting that data.
 
 ## Attaching to a ring
 

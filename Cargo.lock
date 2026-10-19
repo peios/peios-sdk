@@ -25,7 +25,7 @@ checksum = "3eaf3ede3fee6db1a4c2ee091bf8a8b4dccdc6d17f656fb07896ee72867612f2"
 
 [[package]]
 name = "libpeios"
-version = "0.5.11"
+version = "0.5.12"
 dependencies = [
  "kacs-core",
  "libc",
@@ -35,7 +35,7 @@ dependencies = [
 
 [[package]]
 name = "librsi"
-version = "0.5.11"
+version = "0.5.12"
 dependencies = [
  "lcs-core",
  "libc",
@@ -45,7 +45,7 @@ dependencies = [
 
 [[package]]
 name = "peios-cabi"
-version = "0.5.11"
+version = "0.5.12"
 dependencies = [
  "libc",
 ]

@@ -1,7 +1,7 @@
 {
     "package": {
         "name": "dev.peios.librsi-devel",
-        "version": "0.5.11-1",
+        "version": "0.5.12-1",
         "architecture": "x86_64",
         "license": "MIT",
         "license_class": "free",
@@ -9,7 +9,7 @@
         "description": "Headers and link metadata for librsi"
     },
     "dependencies": {
-        "dev.peios.librsi": "= 0.5.11-1",
+        "dev.peios.librsi": "= 0.5.12-1",
         "dev.peios.kernel-headers": ">= 0.20.1-rc13-1"
     },
     "files": {
