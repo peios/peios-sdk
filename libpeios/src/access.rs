@@ -60,7 +60,17 @@ fn ptr_len_valid<T>(ptr: *const T, len: usize) -> bool {
     len == 0 || !ptr.is_null()
 }
 
-fn validate_request(req: &peios_access_request, require_object_tree: bool) -> Result<(), c_int> {
+#[derive(Clone, Copy)]
+enum RequestKind {
+    Scalar,
+    ObjectTree,
+}
+
+/// Validate the pointer relationships and the pointed-to audit context.
+///
+/// # Safety
+/// A non-NULL audit context must remain readable for its stated length.
+unsafe fn validate_request(req: &peios_access_request, kind: RequestKind) -> Result<(), c_int> {
     if req.sd.is_null() || req.sd_len == 0 {
         return Err(libc::EINVAL);
     }
@@ -71,7 +81,7 @@ fn validate_request(req: &peios_access_request, require_object_tree: bool) -> Re
     {
         return Err(libc::EINVAL);
     }
-    if require_object_tree && req.object_tree_count == 0 {
+    if matches!(kind, RequestKind::ObjectTree) && req.object_tree_count == 0 {
         return Err(libc::EINVAL);
     }
     // An audit context is refused here by the kernel's own rules, so a caller
@@ -398,9 +408,16 @@ fn enc_map(buf: &mut Vec<u8>, n: usize) -> Result<(), c_int> {
     }
 }
 
-/// A `str` (`bin` when `bin`), in its smallest form. Anything above 64 KiB
+#[derive(Clone, Copy)]
+enum BlobKind {
+    String,
+    Binary,
+}
+
+/// A MessagePack string or binary value in its smallest form. Anything above 64 KiB
 /// could never fit an audit context, so the 32-bit forms are not needed.
-fn enc_blob(buf: &mut Vec<u8>, bytes: &[u8], bin: bool) -> Result<(), c_int> {
+fn enc_blob(buf: &mut Vec<u8>, bytes: &[u8], kind: BlobKind) -> Result<(), c_int> {
+    let bin = matches!(kind, BlobKind::Binary);
     let n = bytes.len();
     if !bin && n <= 31 {
         enc_push(buf, &[0xa0 | n as u8])?;
@@ -488,12 +505,12 @@ unsafe fn encode_audit_context(
 
     let mut buf = Vec::new();
     enc_map(&mut buf, if fields.is_empty() { 1 } else { 2 })?;
-    enc_blob(&mut buf, b"kind", false)?;
-    enc_blob(&mut buf, kind, false)?;
+    enc_blob(&mut buf, b"kind", BlobKind::String)?;
+    enc_blob(&mut buf, kind, BlobKind::String)?;
     if fields.is_empty() {
         return Ok(buf);
     }
-    enc_blob(&mut buf, kind, false)?;
+    enc_blob(&mut buf, kind, BlobKind::String)?;
     enc_map(&mut buf, fields.len())?;
 
     for (i, field) in fields.iter().enumerate() {
@@ -503,35 +520,8 @@ unsafe fn encode_audit_context(
                 return Err(libc::EINVAL);
             }
         }
-        enc_blob(&mut buf, key, false)?;
-        match field.value_type {
-            PEIOS_AUDIT_UINT => enc_uint(&mut buf, field.scalar)?,
-            PEIOS_AUDIT_INT => enc_int(&mut buf, field.scalar as i64)?,
-            PEIOS_AUDIT_BOOL => match field.scalar {
-                0 => enc_push(&mut buf, &[0xc2])?,
-                1 => enc_push(&mut buf, &[0xc3])?,
-                _ => return Err(libc::EINVAL),
-            },
-            PEIOS_AUDIT_STR | PEIOS_AUDIT_BIN => {
-                if field.bytes.is_null() && field.len != 0 {
-                    return Err(libc::EINVAL);
-                }
-                if field.len > AUDIT_CONTEXT_MAX_LEN {
-                    return Err(libc::EINVAL);
-                }
-                let bytes: &[u8] = if field.len == 0 {
-                    &[]
-                } else {
-                    core::slice::from_raw_parts(field.bytes as *const u8, field.len)
-                };
-                let bin = field.value_type == PEIOS_AUDIT_BIN;
-                if !bin && core::str::from_utf8(bytes).is_err() {
-                    return Err(libc::EINVAL);
-                }
-                enc_blob(&mut buf, bytes, bin)?;
-            }
-            _ => return Err(libc::EINVAL),
-        }
+        enc_blob(&mut buf, key, BlobKind::String)?;
+        encode_audit_value(&mut buf, field)?;
         if buf.len() > AUDIT_CONTEXT_MAX_LEN {
             return Err(libc::EINVAL);
         }
@@ -542,6 +532,50 @@ unsafe fn encode_audit_context(
         return Err(libc::EINVAL);
     }
     Ok(buf)
+}
+
+/// Encode one scalar field after its key has been checked.
+///
+/// # Safety
+/// A non-NULL byte pointer must be readable for the field's stated length.
+unsafe fn encode_audit_value(buf: &mut Vec<u8>, field: &peios_audit_field) -> Result<(), c_int> {
+    match field.value_type {
+        PEIOS_AUDIT_UINT => enc_uint(buf, field.scalar)?,
+        PEIOS_AUDIT_INT => enc_int(buf, field.scalar as i64)?,
+        PEIOS_AUDIT_BOOL => match field.scalar {
+            0 => enc_push(buf, &[0xc2])?,
+            1 => enc_push(buf, &[0xc3])?,
+            _ => return Err(libc::EINVAL),
+        },
+        PEIOS_AUDIT_STR | PEIOS_AUDIT_BIN => {
+            if field.bytes.is_null() && field.len != 0 {
+                return Err(libc::EINVAL);
+            }
+            if field.len > AUDIT_CONTEXT_MAX_LEN {
+                return Err(libc::EINVAL);
+            }
+            let bytes: &[u8] = if field.len == 0 {
+                &[]
+            } else {
+                core::slice::from_raw_parts(field.bytes as *const u8, field.len)
+            };
+            let bin = field.value_type == PEIOS_AUDIT_BIN;
+            if !bin && core::str::from_utf8(bytes).is_err() {
+                return Err(libc::EINVAL);
+            }
+            enc_blob(
+                buf,
+                bytes,
+                if bin {
+                    BlobKind::Binary
+                } else {
+                    BlobKind::String
+                },
+            )?;
+        }
+        _ => return Err(libc::EINVAL),
+    }
+    Ok(())
 }
 
 /// `peios_audit_context_encode` — encode a PGSS §6.7 audit context naming an
@@ -646,7 +680,7 @@ pub unsafe extern "C" fn peios_access_check(
         set_errno(libc::EINVAL);
         return -1;
     };
-    if let Err(errno) = validate_request(req, false) {
+    if let Err(errno) = validate_request(req, RequestKind::Scalar) {
         set_errno(errno);
         return -1;
     }
@@ -740,7 +774,7 @@ pub unsafe extern "C" fn peios_access_check_list(
         set_errno(libc::EINVAL);
         return -1;
     };
-    if let Err(errno) = validate_request(req, true) {
+    if let Err(errno) = validate_request(req, RequestKind::ObjectTree) {
         set_errno(errno);
         return -1;
     }
@@ -1300,7 +1334,8 @@ mod tests {
         let mut req = request(&sd, &[]);
         req.audit_context = ctx.as_ptr() as *const c_void;
         req.audit_context_len = ctx.len();
-        assert!(validate_request(&req, false).is_ok());
+        // SAFETY: the request borrows the live `ctx` buffer.
+        assert!(unsafe { validate_request(&req, RequestKind::Scalar) }.is_ok());
         let a = build_args(&req).unwrap();
         assert_eq!(a.audit_context_ptr, ctx.as_ptr() as usize as u64);
         assert_eq!(a.audit_context_len as usize, ctx.len());

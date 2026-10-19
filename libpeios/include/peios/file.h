@@ -20,11 +20,11 @@
 
 #include <stddef.h>
 #include <stdint.h>
-#include <sys/types.h>		/* ssize_t */
+#include <sys/types.h> /* ssize_t */
 
-#include <pkm/sd.h>		/* struct kacs_generic_mapping */
+#include <pkm/sd.h> /* struct kacs_generic_mapping */
 #include <pkm/file.h>
-#include <pkm/ipc.h>		/* KACS_SD_AT_SYSV_* */
+#include <pkm/ipc.h> /* KACS_SD_AT_SYSV_* */
 
 #ifdef __cplusplus
 extern "C" {
@@ -35,12 +35,12 @@ extern "C" {
  * struct kacs_open_how (setting its size and zeroing reserved fields).
  */
 struct peios_open_params {
-	uint32_t	desired_access;	/* KACS_FILE_* | standard | generic (strict-mode) */
-	uint32_t	disposition;	/* KACS_DISPOSITION_*  */
-	uint32_t	options;	/* KACS_CREATE_OPT_*   */
-	uint32_t	flags;		/* AT_SYMLINK_NOFOLLOW | KACS_BACKUP_INTENT | KACS_RESTORE_INTENT */
-	const void     *sd;		/* creator SD on create, else NULL */
-	size_t		sd_len;
+    uint32_t desired_access; /* KACS_FILE_* | standard | generic (strict-mode) */
+    uint32_t disposition;    /* KACS_DISPOSITION_*  */
+    uint32_t options;        /* KACS_CREATE_OPT_*   */
+    uint32_t flags;          /* AT_SYMLINK_NOFOLLOW | KACS_BACKUP_INTENT | KACS_RESTORE_INTENT */
+    const void *sd;          /* creator SD on create, else NULL */
+    size_t sd_len;
 };
 
 /*
@@ -48,8 +48,8 @@ struct peios_open_params {
  * @status_out: if non-NULL, receives KACS_STATUS_* (opened / created / …).
  * Returns a file fd, or -1 with errno.
  */
-int peios_file_open(int dirfd, const char *path,
-		    const struct peios_open_params *p, uint32_t *status_out);
+int peios_file_open(int dirfd, const char *path, const struct peios_open_params *p,
+                    uint32_t *status_out);
 
 /*
  * Read a file's security descriptor. @secinfo selects components
@@ -57,12 +57,12 @@ int peios_file_open(int dirfd, const char *path,
  * pass cap == 0 to probe for the size; a too-small non-zero buffer fails with
  * ERANGE and writes nothing — libpeios never yields a truncated SD.
  */
-ssize_t peios_file_get_sd(int dirfd, const char *path, uint32_t secinfo,
-			  void *buf, size_t cap, uint32_t at_flags);
+ssize_t peios_file_get_sd(int dirfd, const char *path, uint32_t secinfo, void *buf, size_t cap,
+                          uint32_t at_flags);
 
 /* Write the @secinfo components of @sd onto a file; preserves the rest. */
-int peios_file_set_sd(int dirfd, const char *path, uint32_t secinfo,
-		      const void *sd, size_t len, uint32_t at_flags);
+int peios_file_set_sd(int dirfd, const char *path, uint32_t secinfo, const void *sd, size_t len,
+                      uint32_t at_flags);
 
 /*
  * System V IPC objects — message queues, shared memory segments and semaphore
@@ -72,10 +72,8 @@ int peios_file_set_sd(int dirfd, const char *path, uint32_t secinfo,
  * in the caller's IPC namespace (EINVAL unknown, EIDRM removed). Same
  * getxattr-style contract as the calls above.
  */
-ssize_t peios_sysv_get_sd(uint32_t kind, int id, uint32_t secinfo,
-			  void *buf, size_t cap);
-int	peios_sysv_set_sd(uint32_t kind, int id, uint32_t secinfo,
-			  const void *sd, size_t len);
+ssize_t peios_sysv_get_sd(uint32_t kind, int id, uint32_t secinfo, void *buf, size_t cap);
+int peios_sysv_set_sd(uint32_t kind, int id, uint32_t secinfo, const void *sd, size_t len);
 
 /*
  * fd-targeted SD get/set — operate on the object @fd already refers to. The
@@ -84,7 +82,7 @@ int	peios_sysv_set_sd(uint32_t kind, int id, uint32_t secinfo,
  * PSD-004 §11.5.
  */
 ssize_t peios_fd_get_sd(int fd, uint32_t secinfo, void *buf, size_t cap);
-int	peios_fd_set_sd(int fd, uint32_t secinfo, const void *sd, size_t len);
+int peios_fd_set_sd(int fd, uint32_t secinfo, const void *sd, size_t len);
 
 /*
  * Mount policy for the superblock @fd lives on (SeTcbPrivilege). On get,
@@ -93,14 +91,13 @@ int	peios_fd_set_sd(int fd, uint32_t secinfo, const void *sd, size_t len);
  * buffer/pointer is valid only with a zero template capacity/length.
  */
 struct peios_mount_policy {
-	uint32_t	policy;		/* KACS_MOUNT_POLICY_* */
-	uint32_t	flags;
-	uint32_t	generation;
-	const void     *template_sd;
-	size_t		template_sd_len;
+    uint32_t policy; /* KACS_MOUNT_POLICY_* */
+    uint32_t flags;
+    uint32_t generation;
+    const void *template_sd;
+    size_t template_sd_len;
 };
-int peios_mount_get_policy(int fd, struct peios_mount_policy *out,
-			   void *tmpl_buf, size_t tmpl_cap);
+int peios_mount_get_policy(int fd, struct peios_mount_policy *out, void *tmpl_buf, size_t tmpl_cap);
 int peios_mount_set_policy(int fd, const struct peios_mount_policy *p);
 
 /* The canonical KACS generic mapping for the file object class. */

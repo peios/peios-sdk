@@ -22,11 +22,11 @@ extern "C" {
 
 /* One hive this source backs. */
 struct rsi_hive {
-	const void     *name;		/* hive name (not NUL-terminated) */
-	uint32_t	name_len;
-	uint32_t	flags;		/* RSI_HIVE_PRIVATE, or 0 for a global hive */
-	uint8_t		root_guid[16];	/* root key GUID */
-	uint8_t		scope_guid[16];	/* private hives; zero for a global hive */
+    const void *name; /* hive name (not NUL-terminated) */
+    uint32_t name_len;
+    uint32_t flags;         /* RSI_HIVE_PRIVATE, or 0 for a global hive */
+    uint8_t root_guid[16];  /* root key GUID */
+    uint8_t scope_guid[16]; /* private hives; zero for a global hive */
 };
 
 /*

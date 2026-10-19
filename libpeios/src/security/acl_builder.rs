@@ -168,7 +168,7 @@ impl peios_acl_builder {
 
         // Patch in the encoded size; ACE sizes are u16 and 4-aligned.
         let size = ace.len();
-        if size > u16::MAX as usize || size % 4 != 0 {
+        if size > u16::MAX as usize || !size.is_multiple_of(4) {
             return Err(libc::EINVAL);
         }
         ace[2..4].copy_from_slice(&(size as u16).to_le_bytes());
@@ -223,11 +223,17 @@ fn integrity_sid(rid: u32) -> [u8; 12] {
 }
 
 /// View a trustee SID pointer/len as a slice (`None` if NULL).
+///
+/// # Safety
+/// A non-NULL `sid` must remain readable for `len` bytes for the borrowed lifetime.
 unsafe fn sid_slice<'a>(sid: *const c_void, len: usize) -> Option<&'a [u8]> {
     (!sid.is_null()).then(|| slice::from_raw_parts(sid as *const u8, len))
 }
 
 /// View a 16-byte GUID pointer (`None` if NULL).
+///
+/// # Safety
+/// A non-NULL `p` must remain readable for 16 bytes for the borrowed lifetime.
 unsafe fn guid_opt<'a>(p: *const u8) -> Option<&'a [u8; 16]> {
     (!p.is_null()).then(|| &*(p as *const [u8; 16]))
 }
@@ -243,12 +249,22 @@ pub extern "C" fn peios_acl_builder_new() -> *mut peios_acl_builder {
 }
 
 /// `peios_acl_builder_free` — destroy a builder (NULL-safe).
+///
+/// # Safety
+/// `b` must be NULL or an exclusively owned live builder from the matching
+/// constructor. A non-NULL builder is consumed and must not be used again.
 #[no_mangle]
 pub unsafe extern "C" fn peios_acl_builder_free(b: *mut peios_acl_builder) {
     raw_free(b);
 }
 
 /// `peios_acl_builder_reset` — drop accumulated ACEs and clear the sticky error.
+///
+/// # Safety
+/// Any non-NULL builder must be live, and calls that mutate it require exclusive
+/// access. Input buffers must remain readable for their stated lengths; non-NULL
+/// output pointers must be aligned and writable for their declared capacities.
+/// Borrowed builder bytes must not be used across mutations or destruction.
 #[no_mangle]
 pub unsafe extern "C" fn peios_acl_builder_reset(b: *mut peios_acl_builder) {
     if let Some(b) = b.as_mut() {
@@ -261,6 +277,10 @@ pub unsafe extern "C" fn peios_acl_builder_reset(b: *mut peios_acl_builder) {
 // ----------------------------------------------------------------------------
 
 /// Shared body of the single-SID convenience adders.
+///
+/// # Safety
+/// A non-NULL builder must be live and exclusively borrowed. A non-NULL SID
+/// pointer must remain readable for `len` bytes throughout the call.
 unsafe fn add_single(
     b: *mut peios_acl_builder,
     ace_type: u8,
@@ -280,6 +300,12 @@ unsafe fn add_single(
 }
 
 /// `peios_acl_builder_allow` — append an access-allowed ACE.
+///
+/// # Safety
+/// Any non-NULL builder must be live, and calls that mutate it require exclusive
+/// access. Input buffers must remain readable for their stated lengths; non-NULL
+/// output pointers must be aligned and writable for their declared capacities.
+/// Borrowed builder bytes must not be used across mutations or destruction.
 #[no_mangle]
 pub unsafe extern "C" fn peios_acl_builder_allow(
     b: *mut peios_acl_builder,
@@ -292,6 +318,12 @@ pub unsafe extern "C" fn peios_acl_builder_allow(
 }
 
 /// `peios_acl_builder_deny` — append an access-denied ACE.
+///
+/// # Safety
+/// Any non-NULL builder must be live, and calls that mutate it require exclusive
+/// access. Input buffers must remain readable for their stated lengths; non-NULL
+/// output pointers must be aligned and writable for their declared capacities.
+/// Borrowed builder bytes must not be used across mutations or destruction.
 #[no_mangle]
 pub unsafe extern "C" fn peios_acl_builder_deny(
     b: *mut peios_acl_builder,
@@ -304,6 +336,12 @@ pub unsafe extern "C" fn peios_acl_builder_deny(
 }
 
 /// `peios_acl_builder_audit` — append a system-audit ACE.
+///
+/// # Safety
+/// Any non-NULL builder must be live, and calls that mutate it require exclusive
+/// access. Input buffers must remain readable for their stated lengths; non-NULL
+/// output pointers must be aligned and writable for their declared capacities.
+/// Borrowed builder bytes must not be used across mutations or destruction.
 #[no_mangle]
 pub unsafe extern "C" fn peios_acl_builder_audit(
     b: *mut peios_acl_builder,
@@ -316,6 +354,12 @@ pub unsafe extern "C" fn peios_acl_builder_audit(
 }
 
 /// `peios_acl_builder_label` — append a mandatory-label ACE for `S-1-16-<rid>`.
+///
+/// # Safety
+/// Any non-NULL builder must be live, and calls that mutate it require exclusive
+/// access. Input buffers must remain readable for their stated lengths; non-NULL
+/// output pointers must be aligned and writable for their declared capacities.
+/// Borrowed builder bytes must not be used across mutations or destruction.
 #[no_mangle]
 pub unsafe extern "C" fn peios_acl_builder_label(
     b: *mut peios_acl_builder,
@@ -339,6 +383,14 @@ pub unsafe extern "C" fn peios_acl_builder_label(
 }
 
 /// `peios_acl_builder_add` — append an arbitrary ACE from a spec.
+///
+/// # Safety
+/// Any non-NULL builder must be live, and calls that mutate it require exclusive
+/// access. Input buffers must remain readable for their stated lengths; non-NULL
+/// output pointers must be aligned and writable for their declared capacities.
+/// Borrowed builder bytes must not be used across mutations or destruction.
+/// A non-NULL `spec` must be initialized; its GUID pointers, when present, must
+/// each refer to 16 readable bytes.
 #[no_mangle]
 pub unsafe extern "C" fn peios_acl_builder_add(
     b: *mut peios_acl_builder,
@@ -381,6 +433,12 @@ pub unsafe extern "C" fn peios_acl_builder_add(
 // ----------------------------------------------------------------------------
 
 /// `peios_acl_builder_bytes` — borrow the serialized ACL (NULL if errored).
+///
+/// # Safety
+/// Any non-NULL builder must be live, and calls that mutate it require exclusive
+/// access. Input buffers must remain readable for their stated lengths; non-NULL
+/// output pointers must be aligned and writable for their declared capacities.
+/// Borrowed builder bytes must not be used across mutations or destruction.
 #[no_mangle]
 pub unsafe extern "C" fn peios_acl_builder_bytes(
     b: *mut peios_acl_builder,
@@ -409,6 +467,12 @@ pub unsafe extern "C" fn peios_acl_builder_bytes(
 }
 
 /// `peios_acl_builder_finish` — copy the serialized ACL out, getxattr-style.
+///
+/// # Safety
+/// Any non-NULL builder must be live, and calls that mutate it require exclusive
+/// access. Input buffers must remain readable for their stated lengths; non-NULL
+/// output pointers must be aligned and writable for their declared capacities.
+/// Borrowed builder bytes must not be used across mutations or destruction.
 #[no_mangle]
 pub unsafe extern "C" fn peios_acl_builder_finish(
     b: *mut peios_acl_builder,
@@ -430,6 +494,12 @@ pub unsafe extern "C" fn peios_acl_builder_finish(
 }
 
 /// `peios_acl_builder_error` — the latched errno, or 0 if healthy.
+///
+/// # Safety
+/// Any non-NULL builder must be live, and calls that mutate it require exclusive
+/// access. Input buffers must remain readable for their stated lengths; non-NULL
+/// output pointers must be aligned and writable for their declared capacities.
+/// Borrowed builder bytes must not be used across mutations or destruction.
 #[no_mangle]
 pub unsafe extern "C" fn peios_acl_builder_error(b: *const peios_acl_builder) -> libc::c_int {
     match b.as_ref() {

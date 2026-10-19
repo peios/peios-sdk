@@ -1,6 +1,6 @@
 //! peios-cabi — shared C-ABI substrate for the Peios userspace libraries.
 //!
-//! The plumbing every Peios `extern "C"` cdylib (libpeios now; librsi next) needs to
+//! The plumbing every Peios `extern "C"` cdylib (libpeios and librsi) needs to
 //! behave as a sound C library:
 //!
 //! - [`LibcAllocator`] — a malloc-backed `GlobalAlloc` (see [`heap`]);

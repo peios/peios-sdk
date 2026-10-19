@@ -21,7 +21,6 @@ use crate::security::sddl::codec::{
     ACE_TYPE_SYSTEM_PROCESS_TRUST_LABEL,
 };
 use crate::security::sddl::wire::Sid;
-
 use crate::security::sddl::wellknown::WellKnownSid;
 
 // ---------------------------------------------------------------------------

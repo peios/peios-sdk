@@ -22,7 +22,7 @@ use peios_uapi::{
 };
 
 use crate::abi::{cstr_bytes, try_extend};
-use crate::error::set_errno;
+use crate::error::{get_errno, set_errno};
 use crate::security::sid_valid;
 use crate::sys::{ret_int, syscall0, syscall1, syscall2, syscall3, syscall5};
 
@@ -38,6 +38,11 @@ pub(crate) unsafe fn create_token_raw(ptr: *const c_void, len: usize) -> c_int {
 }
 
 /// `peios_token_open_self` — open the calling thread's token.
+///
+/// # Safety
+/// Any descriptor arguments must remain open for the call and must not be closed or reused
+/// concurrently. Thread identity changes must be coordinated with code running on the calling
+/// thread.
 #[no_mangle]
 pub unsafe extern "C" fn peios_token_open_self(flags: c_uint, access: u32) -> c_int {
     ret_int(syscall2(
@@ -48,6 +53,11 @@ pub unsafe extern "C" fn peios_token_open_self(flags: c_uint, access: u32) -> c_
 }
 
 /// `peios_token_open_process` — open a process's primary token by pidfd.
+///
+/// # Safety
+/// Any descriptor arguments must remain open for the call and must not be closed or reused
+/// concurrently. Thread identity changes must be coordinated with code running on the calling
+/// thread.
 #[no_mangle]
 pub unsafe extern "C" fn peios_token_open_process(pidfd: c_int, access: u32) -> c_int {
     ret_int(syscall2(
@@ -59,6 +69,11 @@ pub unsafe extern "C" fn peios_token_open_process(pidfd: c_int, access: u32) -> 
 
 /// `peios_token_open_thread` — open a thread's impersonation token (or the
 /// process primary token if the thread is not impersonating).
+///
+/// # Safety
+/// Any descriptor arguments must remain open for the call and must not be closed or reused
+/// concurrently. Thread identity changes must be coordinated with code running on the calling
+/// thread.
 #[no_mangle]
 pub unsafe extern "C" fn peios_token_open_thread(pidfd: c_int, tid: c_int, access: u32) -> c_int {
     ret_int(syscall3(
@@ -72,6 +87,11 @@ pub unsafe extern "C" fn peios_token_open_thread(pidfd: c_int, tid: c_int, acces
 /// `peios_token_open_peer` — open a Unix-socket peer's identity token:
 /// `getsockopt(conn_fd, SOL_KACS, KACS_SO_PEER_TOKEN)`. The kernel writes a
 /// new token fd into the option value.
+///
+/// # Safety
+/// Any descriptor arguments must remain open for the call and must not be closed or reused
+/// concurrently. Thread identity changes must be coordinated with code running on the calling
+/// thread.
 #[no_mangle]
 pub unsafe extern "C" fn peios_token_open_peer(conn_fd: c_int) -> c_int {
     let mut fd: c_int = -1;
@@ -95,6 +115,11 @@ pub unsafe extern "C" fn peios_token_open_peer(conn_fd: c_int) -> c_int {
 /// and close the fd. The convenience form of `peios_token_open_peer` +
 /// `peios_token_impersonate` for a handler that impersonates, works, and
 /// reverts on one thread. Returns 0, or -1 with errno.
+///
+/// # Safety
+/// Any descriptor arguments must remain open for the call and must not be closed or reused
+/// concurrently. Thread identity changes must be coordinated with code running on the calling
+/// thread.
 #[no_mangle]
 pub unsafe extern "C" fn peios_token_impersonate_peer(conn_fd: c_int) -> c_int {
     let fd = peios_token_open_peer(conn_fd);
@@ -102,9 +127,11 @@ pub unsafe extern "C" fn peios_token_impersonate_peer(conn_fd: c_int) -> c_int {
         return -1;
     }
     let r = crate::token::actions::peios_token_impersonate(fd);
-    let saved = *libc::__errno_location();
-    libc::close(fd);
-    *libc::__errno_location() = saved;
+    let saved = get_errno();
+    // The descriptor is consumed even if close reports an error. Preserve the
+    // impersonation result rather than replacing it with a cleanup error.
+    let _ = libc::close(fd);
+    set_errno(saved);
     r
 }
 
@@ -112,9 +139,13 @@ pub unsafe extern "C" fn peios_token_impersonate_peer(conn_fd: c_int) -> c_int {
 /// identity may travel when the peer captures it:
 /// `setsockopt(sock_fd, SOL_KACS, KACS_SO_IMPERSONATION_LEVEL)`. Set by the
 /// client before `connect()`. Returns 0, or -1 with errno.
+///
+/// # Safety
+/// Any descriptor arguments must remain open for the call and must not be closed or reused
+/// concurrently. Thread identity changes must be coordinated with code running on the calling
+/// thread.
 #[no_mangle]
 pub unsafe extern "C" fn peios_socket_set_impersonation_level(sock_fd: c_int, level: u32) -> c_int {
-    let level: u32 = level;
     ret_int(syscall5(
         libc::SYS_setsockopt as u32,
         sock_fd as c_long,
@@ -129,9 +160,14 @@ pub unsafe extern "C" fn peios_socket_set_impersonation_level(sock_fd: c_int, le
 /// send from this socket carries the sender's effective identity as a
 /// `KACS_SCM_TOKEN`, derived at the socket's impersonation level
 /// (`setsockopt(SOL_KACS, KACS_SO_PASS_TOKEN)`). Returns 0, or -1 with errno.
+///
+/// # Safety
+/// Any descriptor arguments must remain open for the call and must not be closed or reused
+/// concurrently. Thread identity changes must be coordinated with code running on the calling
+/// thread.
 #[no_mangle]
 pub unsafe extern "C" fn peios_socket_set_pass_token(sock_fd: c_int, on: bool) -> c_int {
-    let val: u32 = if on { 1 } else { 0 };
+    let val = u32::from(on);
     ret_int(syscall5(
         libc::SYS_setsockopt as u32,
         sock_fd as c_long,
@@ -150,6 +186,11 @@ pub unsafe extern "C" fn peios_socket_set_pass_token(sock_fd: c_int, on: bool) -
 /// broker — restamps it so clients see the process actually accepting.
 /// Self-gated: a process can always attest to what it is. Returns 0, or -1
 /// with errno (EINVAL if the socket is not listening).
+///
+/// # Safety
+/// Any descriptor arguments must remain open for the call and must not be closed or reused
+/// concurrently. Thread identity changes must be coordinated with code running on the calling
+/// thread.
 #[no_mangle]
 pub unsafe extern "C" fn peios_socket_restamp(sock_fd: c_int) -> c_int {
     let val: u32 = 1;
@@ -166,6 +207,10 @@ pub unsafe extern "C" fn peios_socket_restamp(sock_fd: c_int) -> c_int {
 /// `peios_socket_get_impersonation_level` — read the level set on this socket:
 /// `getsockopt(sock_fd, SOL_KACS, KACS_SO_IMPERSONATION_LEVEL)`. Writes the
 /// `KACS_IMLEVEL_*` value to `*level`. Returns 0, or -1 with errno.
+///
+/// # Safety
+/// A non-null `level` must be aligned and writable for one u32. The socket descriptor must not be
+/// closed or reused concurrently.
 #[no_mangle]
 pub unsafe extern "C" fn peios_socket_get_impersonation_level(
     sock_fd: c_int,
@@ -197,18 +242,31 @@ pub unsafe extern "C" fn peios_socket_get_impersonation_level(
 /// Takes no token fd: it clears the calling thread's impersonation token, after
 /// which access checks run as the thread's real (primary) token again. A no-op,
 /// reported as success, if the thread is not impersonating.
+///
+/// # Safety
+/// Any descriptor arguments must remain open for the call and must not be closed or reused
+/// concurrently. Thread identity changes must be coordinated with code running on the calling
+/// thread.
 #[no_mangle]
 pub unsafe extern "C" fn peios_token_revert() -> c_int {
     ret_int(syscall0(SYS_KACS_REVERT))
 }
 
 /// `peios_token_create_raw` — mint a token from a pre-built spec buffer.
+///
+/// # Safety
+/// `spec` must be readable for `len` bytes until the syscall completes.
 #[no_mangle]
 pub unsafe extern "C" fn peios_token_create_raw(spec: *const c_void, len: usize) -> c_int {
     create_token_raw(spec, len)
 }
 
 /// `peios_session_destroy_empty` — destroy a logon session with no live tokens.
+///
+/// # Safety
+/// Any descriptor arguments must remain open for the call and must not be closed or reused
+/// concurrently. Thread identity changes must be coordinated with code running on the calling
+/// thread.
 #[no_mangle]
 pub unsafe extern "C" fn peios_session_destroy_empty(session_id: u64) -> c_int {
     ret_int(syscall1(
@@ -253,6 +311,11 @@ fn encode_session_spec(
 
 /// `peios_session_create` — create a logon session; the id is returned via
 /// `id_out`. Requires `SeTcbPrivilege`.
+///
+/// # Safety
+/// `spec` must be NULL or readable; its non-null authentication-package string must be readable
+/// through its NUL terminator or the maximum session-spec length, and its SID must be readable
+/// for its stated length. A non-null `id_out` must be writable for one u64.
 #[no_mangle]
 pub unsafe extern "C" fn peios_session_create(
     spec: *const peios_session_spec,

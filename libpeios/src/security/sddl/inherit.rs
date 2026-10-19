@@ -16,10 +16,12 @@
 // primitive; this is the canonical userspace shape, and it MUST agree with
 // what the kernel does on creation.
 
+use alloc::vec::Vec;
+use alloc::vec;
+
 use crate::security::sddl::Result;
 use crate::security::sddl::build::{AceBuilder, AclBuilder, SdBuilder};
 use crate::security::sddl::Error;
-use alloc::vec::Vec;
 use crate::security::sddl::codec::{
     ACE_FLAG_CONTAINER_INHERIT, ACE_FLAG_INHERIT_ONLY, ACE_FLAG_INHERITED,
     ACE_FLAG_NO_PROPAGATE_INHERIT, ACE_FLAG_OBJECT_INHERIT, Acl, DACL_SECURITY_INFORMATION,
@@ -28,7 +30,6 @@ use crate::security::sddl::codec::{
     SE_SACL_AUTO_INHERITED, SE_SACL_PROTECTED, SE_SELF_RELATIVE, SecurityDescriptor,
 };
 use crate::security::sddl::wire::{ParseError, SidRef};
-use alloc::vec;
 
 /// CREATOR OWNER (S-1-3-0) and CREATOR GROUP (S-1-3-1), as they are encoded.
 const CREATOR_OWNER: &[u8] = &[1, 1, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0];
@@ -121,7 +122,13 @@ pub fn inherited_aces(parent_acl: &Acl<'_>, child: &Child<'_>) -> Vec<AceBuilder
 /// container: CREATOR OWNER and CREATOR GROUP stay as written, and generic
 /// rights are not mapped.
 pub fn compute_inherited_aces(parent_dacl: &Acl<'_>, child_is_container: bool) -> Vec<AceBuilder> {
-    inherited_aces(parent_dacl, &Child { container: child_is_container, ..Child::default() })
+    inherited_aces(
+        parent_dacl,
+        &Child {
+            container: child_is_container,
+            ..Child::default()
+        },
+    )
 }
 
 /// Where an ACE's SID is in its body, as (offset, length), for a type with
@@ -147,16 +154,25 @@ fn sid_at(ace_type: u8, body: &[u8]) -> Option<(usize, usize)> {
 /// Whether an ACE would change when resolved for `child`: it names a
 /// creator SID, or has generic rights and the child has a mapping.
 fn resolvable(ace: &crate::security::sddl::codec::AceRef<'_>, child: &Child<'_>) -> bool {
-    let Some((at, len)) = sid_at(ace.ace_type, ace.body) else { return false };
+    let Some((at, len)) = sid_at(ace.ace_type, ace.body) else {
+        return false;
+    };
     let sid = &ace.body[at..at + len];
     let mask = u32::from_le_bytes([ace.body[0], ace.body[1], ace.body[2], ace.body[3]]);
-    sid == CREATOR_OWNER || sid == CREATOR_GROUP || (child.mapping.is_some() && mask & GENERIC_BITS != 0)
+    sid == CREATOR_OWNER
+        || sid == CREATOR_GROUP
+        || (child.mapping.is_some() && mask & GENERIC_BITS != 0)
 }
 
 /// `mask` with its generic rights replaced by what `mapping` says they are.
 fn map_mask(mask: u32, mapping: &GenericMapping) -> u32 {
     let mut out = mask & !GENERIC_BITS;
-    for (bit, to) in [(GENERIC_READ, mapping.read), (GENERIC_WRITE, mapping.write), (GENERIC_EXECUTE, mapping.execute), (GENERIC_ALL, mapping.all)] {
+    for (bit, to) in [
+        (GENERIC_READ, mapping.read),
+        (GENERIC_WRITE, mapping.write),
+        (GENERIC_EXECUTE, mapping.execute),
+        (GENERIC_ALL, mapping.all),
+    ] {
         if mask & bit != 0 {
             out |= to;
         }
@@ -167,9 +183,15 @@ fn map_mask(mask: u32, mapping: &GenericMapping) -> u32 {
 /// A copy of `ace` with `flags`, resolved for `child` when one is given:
 /// its creator SID replaced and its generic rights mapped. Application data
 /// is copied verbatim (PCDS §5.6).
-fn copy(ace: &crate::security::sddl::codec::AceRef<'_>, flags: u8, child: Option<&Child<'_>>) -> AceBuilder {
+fn copy(
+    ace: &crate::security::sddl::codec::AceRef<'_>,
+    flags: u8,
+    child: Option<&Child<'_>>,
+) -> AceBuilder {
     let verbatim = || AceBuilder::from_ace_ref(ace).flags(flags);
-    let (Some(child), Some((at, len))) = (child, sid_at(ace.ace_type, ace.body)) else { return verbatim() };
+    let (Some(child), Some((at, len))) = (child, sid_at(ace.ace_type, ace.body)) else {
+        return verbatim();
+    };
     let mask = u32::from_le_bytes([ace.body[0], ace.body[1], ace.body[2], ace.body[3]]);
     let mask = child.mapping.as_ref().map_or(mask, |m| map_mask(mask, m));
     let sid = &ace.body[at..at + len];
@@ -219,7 +241,12 @@ pub fn reinherit_with(
     }
     let owner = verbatim_sid(child_sd, child.owner_off)?;
     let group = verbatim_sid(child_sd, child.group_off)?;
-    let facts = Child { container: child_is_container, owner: owner.as_deref(), group: group.as_deref(), mapping };
+    let facts = Child {
+        container: child_is_container,
+        owner: owner.as_deref(),
+        group: group.as_deref(),
+        mapping,
+    };
     let redo_dacl = info & DACL_SECURITY_INFORMATION != 0 && child.control & SE_DACL_PROTECTED == 0;
     let redo_sacl = info & SACL_SECURITY_INFORMATION != 0 && child.control & SE_SACL_PROTECTED == 0;
 
@@ -292,7 +319,13 @@ fn list(
 /// # Errors
 /// [`Error::Parse`] if either input is malformed or not self-relative.
 pub fn reinherit(parent_sd: &[u8], child_sd: &[u8], child_is_container: bool) -> Result<Vec<u8>> {
-    reinherit_with(parent_sd, child_sd, child_is_container, None, DACL_SECURITY_INFORMATION)
+    reinherit_with(
+        parent_sd,
+        child_sd,
+        child_is_container,
+        None,
+        DACL_SECURITY_INFORMATION,
+    )
 }
 
 /// Strip ACEs carrying `ACE_FLAG_INHERITED` from the ACLs selected by
@@ -459,10 +492,11 @@ mod tests {
 
     #[test]
     fn oi_only_to_file_clears_all_inherit_flags() {
-        let bytes = build_parent_dacl(vec![
-            AceBuilder::allow(WellKnownSid::Everyone, ACCESS_GENERIC_READ)
-                .flags(ACE_FLAG_OBJECT_INHERIT),
-        ]);
+        let bytes = build_parent_dacl(vec![AceBuilder::allow(
+            WellKnownSid::Everyone,
+            ACCESS_GENERIC_READ,
+        )
+        .flags(ACE_FLAG_OBJECT_INHERIT)]);
         let acl = parse_dacl(&bytes);
         let out = compute_inherited_aces(&acl, false);
         assert_eq!(out.len(), 1);
@@ -474,10 +508,11 @@ mod tests {
 
     #[test]
     fn oi_only_to_container_keeps_oi_sets_io() {
-        let bytes = build_parent_dacl(vec![
-            AceBuilder::allow(WellKnownSid::Everyone, ACCESS_GENERIC_READ)
-                .flags(ACE_FLAG_OBJECT_INHERIT),
-        ]);
+        let bytes = build_parent_dacl(vec![AceBuilder::allow(
+            WellKnownSid::Everyone,
+            ACCESS_GENERIC_READ,
+        )
+        .flags(ACE_FLAG_OBJECT_INHERIT)]);
         let acl = parse_dacl(&bytes);
         let out = compute_inherited_aces(&acl, true);
         assert_eq!(out.len(), 1);
@@ -491,20 +526,22 @@ mod tests {
 
     #[test]
     fn ci_only_to_file_emits_nothing() {
-        let bytes = build_parent_dacl(vec![
-            AceBuilder::allow(WellKnownSid::Everyone, ACCESS_GENERIC_READ)
-                .flags(ACE_FLAG_CONTAINER_INHERIT),
-        ]);
+        let bytes = build_parent_dacl(vec![AceBuilder::allow(
+            WellKnownSid::Everyone,
+            ACCESS_GENERIC_READ,
+        )
+        .flags(ACE_FLAG_CONTAINER_INHERIT)]);
         let acl = parse_dacl(&bytes);
         assert!(compute_inherited_aces(&acl, false).is_empty());
     }
 
     #[test]
     fn ci_only_to_container_keeps_ci_clears_io() {
-        let bytes = build_parent_dacl(vec![
-            AceBuilder::allow(WellKnownSid::Everyone, ACCESS_GENERIC_READ)
-                .flags(ACE_FLAG_CONTAINER_INHERIT | ACE_FLAG_INHERIT_ONLY),
-        ]);
+        let bytes = build_parent_dacl(vec![AceBuilder::allow(
+            WellKnownSid::Everyone,
+            ACCESS_GENERIC_READ,
+        )
+        .flags(ACE_FLAG_CONTAINER_INHERIT | ACE_FLAG_INHERIT_ONLY)]);
         let acl = parse_dacl(&bytes);
         let out = compute_inherited_aces(&acl, true);
         assert_eq!(out.len(), 1);
@@ -517,10 +554,11 @@ mod tests {
 
     #[test]
     fn ci_oi_to_container_keeps_both_clears_io() {
-        let bytes = build_parent_dacl(vec![
-            AceBuilder::allow(WellKnownSid::Everyone, ACCESS_GENERIC_READ)
-                .flags(ACE_FLAG_CONTAINER_INHERIT | ACE_FLAG_OBJECT_INHERIT),
-        ]);
+        let bytes = build_parent_dacl(vec![AceBuilder::allow(
+            WellKnownSid::Everyone,
+            ACCESS_GENERIC_READ,
+        )
+        .flags(ACE_FLAG_CONTAINER_INHERIT | ACE_FLAG_OBJECT_INHERIT)]);
         let acl = parse_dacl(&bytes);
         let out = compute_inherited_aces(&acl, true);
         let f = out[0].build()[1];
@@ -532,13 +570,13 @@ mod tests {
 
     #[test]
     fn np_collapses_to_one_level_on_container() {
-        let bytes = build_parent_dacl(vec![
-            AceBuilder::allow(WellKnownSid::Everyone, ACCESS_GENERIC_READ).flags(
-                ACE_FLAG_CONTAINER_INHERIT
-                    | ACE_FLAG_OBJECT_INHERIT
-                    | ACE_FLAG_NO_PROPAGATE_INHERIT,
-            ),
-        ]);
+        let bytes = build_parent_dacl(vec![AceBuilder::allow(
+            WellKnownSid::Everyone,
+            ACCESS_GENERIC_READ,
+        )
+        .flags(
+            ACE_FLAG_CONTAINER_INHERIT | ACE_FLAG_OBJECT_INHERIT | ACE_FLAG_NO_PROPAGATE_INHERIT,
+        )]);
         let acl = parse_dacl(&bytes);
         let out = compute_inherited_aces(&acl, true);
         let f = out[0].build()[1];
@@ -551,10 +589,11 @@ mod tests {
         // OI alone says "applies to files only"; NP says "don't propagate
         // beyond the immediate child." A container child with this combo
         // sees nothing — the ACE doesn't apply (no CI) and won't propagate.
-        let bytes = build_parent_dacl(vec![
-            AceBuilder::allow(WellKnownSid::Everyone, ACCESS_GENERIC_READ)
-                .flags(ACE_FLAG_OBJECT_INHERIT | ACE_FLAG_NO_PROPAGATE_INHERIT),
-        ]);
+        let bytes = build_parent_dacl(vec![AceBuilder::allow(
+            WellKnownSid::Everyone,
+            ACCESS_GENERIC_READ,
+        )
+        .flags(ACE_FLAG_OBJECT_INHERIT | ACE_FLAG_NO_PROPAGATE_INHERIT)]);
         let acl = parse_dacl(&bytes);
         assert!(compute_inherited_aces(&acl, true).is_empty());
     }
@@ -562,10 +601,11 @@ mod tests {
     #[test]
     fn np_with_oi_to_file_emits_one_terminal_ace() {
         // File child of an OI+NP ACE: still inherits, no further propagation.
-        let bytes = build_parent_dacl(vec![
-            AceBuilder::allow(WellKnownSid::Everyone, ACCESS_GENERIC_READ)
-                .flags(ACE_FLAG_OBJECT_INHERIT | ACE_FLAG_NO_PROPAGATE_INHERIT),
-        ]);
+        let bytes = build_parent_dacl(vec![AceBuilder::allow(
+            WellKnownSid::Everyone,
+            ACCESS_GENERIC_READ,
+        )
+        .flags(ACE_FLAG_OBJECT_INHERIT | ACE_FLAG_NO_PROPAGATE_INHERIT)]);
         let acl = parse_dacl(&bytes);
         let out = compute_inherited_aces(&acl, false);
         assert_eq!(out.len(), 1);
@@ -579,10 +619,11 @@ mod tests {
         // Parent ACE has INHERITED set (from grandparent). Child copy
         // also has INHERITED set — same bit, just confirms we OR rather
         // than overwrite.
-        let bytes = build_parent_dacl(vec![
-            AceBuilder::allow(WellKnownSid::Everyone, ACCESS_GENERIC_READ)
-                .flags(ACE_FLAG_OBJECT_INHERIT | ACE_FLAG_INHERITED),
-        ]);
+        let bytes = build_parent_dacl(vec![AceBuilder::allow(
+            WellKnownSid::Everyone,
+            ACCESS_GENERIC_READ,
+        )
+        .flags(ACE_FLAG_OBJECT_INHERIT | ACE_FLAG_INHERITED)]);
         let acl = parse_dacl(&bytes);
         let out = compute_inherited_aces(&acl, false);
         let f = out[0].build()[1];
@@ -748,11 +789,19 @@ mod tests {
 
     // ---- re-propagation, as KACS creates ----
 
-    const FILE: GenericMapping = GenericMapping { read: 0x120089, write: 0x120116, execute: 0x1200a0, all: 0x1f01ff };
+    const FILE: GenericMapping = GenericMapping {
+        read: 0x120089,
+        write: 0x120116,
+        execute: 0x1200a0,
+        all: 0x1f01ff,
+    };
     const ME: &str = "S-1-5-21-1-2-3-1000";
 
     fn sd(text: &str) -> Vec<u8> {
-        crate::security::sddl::grammar::parse(text).unwrap().build().unwrap()
+        crate::security::sddl::grammar::parse(text)
+            .unwrap()
+            .build()
+            .unwrap()
     }
 
     fn text(bytes: &[u8]) -> String {
@@ -765,7 +814,16 @@ mod tests {
     fn a_child_gets_what_kacs_gives_one_it_creates() {
         let parent = sd("O:BAG:BAD:P(A;OICI;FA;;;BA)(A;OICIIO;GA;;;CO)(A;OICI;GR;;;AU)(A;OICINP;FR;;;S-1-5-21-1-2-3-1001)");
         let folder = sd(&format!("O:{ME}G:AUD:(A;;FA;;;{ME})"));
-        let got = text(&reinherit_with(&parent, &folder, true, Some(FILE), DACL_SECURITY_INFORMATION).unwrap());
+        let got = text(
+            &reinherit_with(
+                &parent,
+                &folder,
+                true,
+                Some(FILE),
+                DACL_SECURITY_INFORMATION,
+            )
+            .unwrap(),
+        );
         assert_eq!(
             got,
             format!(
@@ -773,7 +831,9 @@ mod tests {
             )
         );
         let file = sd(&format!("O:{ME}G:AUD:"));
-        let got = text(&reinherit_with(&parent, &file, false, Some(FILE), DACL_SECURITY_INFORMATION).unwrap());
+        let got = text(
+            &reinherit_with(&parent, &file, false, Some(FILE), DACL_SECURITY_INFORMATION).unwrap(),
+        );
         assert_eq!(got, format!("O:{ME}G:AUD:AI(A;ID;FA;;;BA)(A;ID;FA;;;{ME})(A;ID;FR;;;AU)(A;ID;FR;;;S-1-5-21-1-2-3-1001)"));
     }
 
@@ -781,26 +841,60 @@ mod tests {
     fn a_grandchild_resolves_the_rule_its_parent_carried_on() {
         let parent = sd("O:BAG:BAD:(A;OICIIOID;GA;;;CO)");
         let child = sd("O:S-1-5-21-1-2-3-1002G:BAD:");
-        let got = text(&reinherit_with(&parent, &child, false, Some(FILE), DACL_SECURITY_INFORMATION).unwrap());
-        assert_eq!(got, "O:S-1-5-21-1-2-3-1002G:BAD:AI(A;ID;FA;;;S-1-5-21-1-2-3-1002)");
+        let got = text(
+            &reinherit_with(
+                &parent,
+                &child,
+                false,
+                Some(FILE),
+                DACL_SECURITY_INFORMATION,
+            )
+            .unwrap(),
+        );
+        assert_eq!(
+            got,
+            "O:S-1-5-21-1-2-3-1002G:BAD:AI(A;ID;FA;;;S-1-5-21-1-2-3-1002)"
+        );
     }
 
     #[test]
     fn a_protected_list_is_left_and_the_other_redone() {
         let parent = sd("O:BAG:BAD:(A;OICI;FA;;;BA)S:(AU;OICISA;FA;;;WD)");
         let child = sd("O:BAG:BAD:P(A;;FA;;;SY)S:(AU;IDSA;FA;;;AU)");
-        let got = text(&reinherit_with(&parent, &child, true, Some(FILE), DACL_SECURITY_INFORMATION | SACL_SECURITY_INFORMATION).unwrap());
+        let got = text(
+            &reinherit_with(
+                &parent,
+                &child,
+                true,
+                Some(FILE),
+                DACL_SECURITY_INFORMATION | SACL_SECURITY_INFORMATION,
+            )
+            .unwrap(),
+        );
         assert_eq!(got, "O:BAG:BAD:P(A;;FA;;;SY)S:AI(AU;CIOIIDSA;FA;;;WD)");
         let child = sd("O:BAG:BAD:(A;;FA;;;SY)S:P(AU;IDSA;FA;;;AU)");
-        let got = text(&reinherit_with(&parent, &child, true, Some(FILE), DACL_SECURITY_INFORMATION | SACL_SECURITY_INFORMATION).unwrap());
-        assert_eq!(got, "O:BAG:BAD:AI(A;;FA;;;SY)(A;CIOIID;FA;;;BA)S:P(AU;IDSA;FA;;;AU)");
+        let got = text(
+            &reinherit_with(
+                &parent,
+                &child,
+                true,
+                Some(FILE),
+                DACL_SECURITY_INFORMATION | SACL_SECURITY_INFORMATION,
+            )
+            .unwrap(),
+        );
+        assert_eq!(
+            got,
+            "O:BAG:BAD:AI(A;;FA;;;SY)(A;CIOIID;FA;;;BA)S:P(AU;IDSA;FA;;;AU)"
+        );
     }
 
     #[test]
     fn only_the_lists_asked_for_are_redone() {
         let parent = sd("O:BAG:BAD:(A;OICI;FA;;;BA)S:(AU;OICISA;FA;;;WD)");
         let child = sd("O:BAG:BAD:(A;ID;FR;;;AU)S:(AU;IDSA;FA;;;AU)");
-        let got = text(&reinherit_with(&parent, &child, false, None, SACL_SECURITY_INFORMATION).unwrap());
+        let got =
+            text(&reinherit_with(&parent, &child, false, None, SACL_SECURITY_INFORMATION).unwrap());
         assert_eq!(got, "O:BAG:BAD:(A;ID;FR;;;AU)S:AI(AU;IDSA;FA;;;WD)");
     }
 }

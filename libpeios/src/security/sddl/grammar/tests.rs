@@ -1,13 +1,15 @@
 // SDDL round-trip and unit tests.
 
+use alloc::string::{String, ToString};
+use alloc::vec;
+
 use super::*;
 use crate::security::sddl::build::{AceBuilder, AclBuilder, SdBuilder};
 use crate::security::sddl::condition::{CompareOp, Condition, MemberOp, Operand};
 use crate::security::sddl::wellknown::WellKnownSid;
-use alloc::string::{String, ToString};
-use alloc::vec;
 use crate::security::sddl::codec::{
-    ACCESS_GENERIC_ALL, ACCESS_GENERIC_READ, ACE_FLAG_CONTAINER_INHERIT, SecurityDescriptor, SE_SELF_RELATIVE,
+    ACCESS_GENERIC_ALL, ACCESS_GENERIC_READ, ACE_FLAG_CONTAINER_INHERIT, SecurityDescriptor,
+    SE_SELF_RELATIVE,
 };
 use crate::security::sddl::wire::Sid;
 
@@ -70,7 +72,9 @@ fn null_and_empty_acls_match_the_kernel_contract() {
     // independently of any userspace codec; the kernel parser is the
     // acceptance oracle.
     for line in include_str!("../testdata/null-acl-vectors.tsv").lines() {
-        if line.starts_with('#') || line.is_empty() { continue; }
+        if line.starts_with('#') || line.is_empty() {
+            continue;
+        }
         let fields: alloc::vec::Vec<_> = line.split('\t').collect();
         let bytes = parse(fields[0]).unwrap().build().unwrap();
         let kernel = kacs_core::SecurityDescriptor::parse(&bytes)
@@ -88,9 +92,12 @@ fn null_and_empty_acls_match_the_kernel_contract() {
 #[test]
 fn null_acl_rejects_aces_duplicate_markers_and_split_flags() {
     for section in ['D', 'S'] {
-        for bad in ["NO_ACCESS_CONTROL(A;;GA;;;WD)",
-                    "NO_ACCESS_CONTROLNO_ACCESS_CONTROL", "NO_ACCESS_CONTRO",
-                    "ANO_ACCESS_CONTROLR"] {
+        for bad in [
+            "NO_ACCESS_CONTROL(A;;GA;;;WD)",
+            "NO_ACCESS_CONTROLNO_ACCESS_CONTROL",
+            "NO_ACCESS_CONTRO",
+            "ANO_ACCESS_CONTROLR",
+        ] {
             assert!(parse(&format!("{section}:{bad}")).is_err());
         }
     }
@@ -232,7 +239,10 @@ fn alarms_round_trip() {
 
 #[test]
 fn trust_label_and_access_filter_round_trip() {
-    for s in ["S:(TL;;RC;;;S-1-19-1024-8192)", "S:(FL;;FA;;;WD;(Member_of {SID(BA)}))"] {
+    for s in [
+        "S:(TL;;RC;;;S-1-19-1024-8192)",
+        "S:(FL;;FA;;;WD;(Member_of {SID(BA)}))",
+    ] {
         assert_eq!(round_trip(s), s);
     }
 }
@@ -244,10 +254,15 @@ fn an_ace_type_without_a_code_fails_the_format() {
     for ace_type in [0x04u8, 0x16] {
         let mut body = vec![0xffu8, 0x01, 0x1f, 0x00];
         body.extend_from_slice(&parse_sid("WD").unwrap().encode());
-        let acl = AclBuilder::new().allow(parse_sid("BA").unwrap(), 0x1f01ff).ace(AceBuilder::raw(ace_type, body).unwrap());
+        let acl = AclBuilder::new()
+            .allow(parse_sid("BA").unwrap(), 0x1f01ff)
+            .ace(AceBuilder::raw(ace_type, body).unwrap());
         let bytes = SdBuilder::new().dacl(acl).build().unwrap();
         let sd = SecurityDescriptor::parse(&bytes).unwrap();
-        assert_eq!(format(&sd), Err(SddlError::Format("ACE type has no SDDL code")));
+        assert_eq!(
+            format(&sd),
+            Err(SddlError::Format("ACE type has no SDDL code"))
+        );
     }
 }
 
@@ -318,7 +333,10 @@ fn parse_acl_extracts_flag_bits() {
 fn parse_ace_basic() {
     let ace = parse_ace("A;;FA;;;BA").expect("parse");
     let bytes = ace.build();
-    assert_eq!(bytes[0], crate::security::sddl::codec::ACE_TYPE_ACCESS_ALLOWED);
+    assert_eq!(
+        bytes[0],
+        crate::security::sddl::codec::ACE_TYPE_ACCESS_ALLOWED
+    );
 }
 
 #[test]
@@ -845,10 +863,7 @@ fn mixed_rights_field_in_whole_descriptor() {
 fn ru_is_builtin_not_domain_relative() {
     // BUILTIN\Pre-Windows 2000 Compatible Access reads like a domain alias
     // and is not one; libpeios used to reject it as domain-relative.
-    assert_eq!(
-        parse_sid("RU").unwrap().to_string(),
-        "S-1-5-32-554"
-    );
+    assert_eq!(parse_sid("RU").unwrap().to_string(), "S-1-5-32-554");
 }
 
 #[test]

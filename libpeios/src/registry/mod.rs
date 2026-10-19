@@ -9,7 +9,7 @@
 //!
 //! It deliberately does **not** cover the registry *source* (storage-backend) side:
 //! `REG_SRC_REGISTER` and the RSI (Registry Source Interface) framed protocol live
-//! in a future separate `librsi`. A client never speaks RSI; it speaks syscalls and
+//! in the separate `librsi` library. A client speaks syscalls and
 //! key/transaction-fd ioctls.
 //!
 //! ## Kernel entry shape

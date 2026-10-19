@@ -42,6 +42,10 @@ pub struct peios_token_statistics {
 }
 
 /// `peios_token_query` — read an information class, getxattr-style.
+///
+/// # Safety
+/// The output buffer may be NULL for a size probe; otherwise it is exclusively writable for its advertised
+/// capacity until the call returns.
 #[no_mangle]
 pub unsafe extern "C" fn peios_token_query(
     fd: c_int,
@@ -107,12 +111,20 @@ unsafe fn query_into<T>(fd: c_int, class: u32, out: *mut T) -> c_int {
 }
 
 /// `peios_token_user` — the user SID (`KACS_TOKEN_CLASS_USER`), getxattr-style.
+///
+/// # Safety
+/// The output buffer may be NULL for a size probe; otherwise it is exclusively writable for its advertised
+/// capacity until the call returns.
 #[no_mangle]
 pub unsafe extern "C" fn peios_token_user(fd: c_int, sid_buf: *mut c_void, cap: usize) -> isize {
     peios_token_query(fd, KACS_TOKEN_CLASS_USER, sid_buf, cap)
 }
 
 /// `peios_token_type` — the token type (`KACS_TOKEN_CLASS_TYPE`).
+///
+/// # Safety
+/// A non-null `out` must be aligned and writable for its declared output type until the call
+/// returns.
 #[no_mangle]
 pub unsafe extern "C" fn peios_token_type(fd: c_int, out: *mut u32) -> c_int {
     query_into(fd, KACS_TOKEN_CLASS_TYPE, out)
@@ -121,6 +133,10 @@ pub unsafe extern "C" fn peios_token_type(fd: c_int, out: *mut u32) -> c_int {
 /// `peios_token_impersonation_level` — the token's impersonation level
 /// (`KACS_TOKEN_CLASS_IMPERSONATION_LEVEL`): the ceiling on what may be
 /// derived from it, on a primary token as much as an impersonation one.
+///
+/// # Safety
+/// A non-null `out` must be aligned and writable for its declared output type until the call
+/// returns.
 #[no_mangle]
 pub unsafe extern "C" fn peios_token_impersonation_level(fd: c_int, out: *mut u32) -> c_int {
     query_into(fd, KACS_TOKEN_CLASS_IMPERSONATION_LEVEL, out)
@@ -129,6 +145,10 @@ pub unsafe extern "C" fn peios_token_impersonation_level(fd: c_int, out: *mut u3
 /// `peios_token_interactivity_scope` — the interactive environment scope
 /// (`KACS_TOKEN_CLASS_INTERACTIVITY_SCOPE`). This is not the token's
 /// LogonSession LUID / `auth_id`.
+///
+/// # Safety
+/// A non-null `out` must be aligned and writable for its declared output type until the call
+/// returns.
 #[no_mangle]
 pub unsafe extern "C" fn peios_token_interactivity_scope(fd: c_int, out: *mut u32) -> c_int {
     query_into(fd, KACS_TOKEN_CLASS_INTERACTIVITY_SCOPE, out)
@@ -136,6 +156,10 @@ pub unsafe extern "C" fn peios_token_interactivity_scope(fd: c_int, out: *mut u3
 
 /// `peios_token_statistics` — token ids, including the LogonSession LUID in
 /// `auth_id` (`KACS_TOKEN_CLASS_STATISTICS`).
+///
+/// # Safety
+/// A non-null `out` must be aligned and writable for its declared output type until the call
+/// returns.
 #[no_mangle]
 pub unsafe extern "C" fn peios_token_statistics(
     fd: c_int,
@@ -145,6 +169,9 @@ pub unsafe extern "C" fn peios_token_statistics(
 }
 
 /// `peios_token_guid` — the immutable raw GUID used by KMES.
+///
+/// # Safety
+/// A non-null `guid_out` must be writable for 16 bytes until the call returns.
 #[no_mangle]
 pub unsafe extern "C" fn peios_token_guid(fd: c_int, guid_out: *mut u8) -> c_int {
     query_into::<[u8; 16]>(fd, KACS_TOKEN_CLASS_GUID, guid_out.cast())
@@ -161,6 +188,9 @@ pub unsafe extern "C" fn peios_token_guid(fd: c_int, guid_out: *mut u8) -> c_int
 /// `query_into::<u32>` would (correctly) get -ERANGE from the kernel's size
 /// probe. Always exactly 12 bytes: an integrity SID never has more than one
 /// sub-authority.
+///
+/// # Safety
+/// A non-null `level_rid_out` must be aligned and writable for one u32.
 #[no_mangle]
 pub unsafe extern "C" fn peios_token_integrity(fd: c_int, level_rid_out: *mut u32) -> c_int {
     if level_rid_out.is_null() {
@@ -187,6 +217,10 @@ pub unsafe extern "C" fn peios_token_integrity(fd: c_int, level_rid_out: *mut u3
 }
 
 /// `peios_token_privileges` — the privilege words (`KACS_TOKEN_CLASS_PRIVILEGES`).
+///
+/// # Safety
+/// A non-null `out` must be aligned and writable for its declared output type until the call
+/// returns.
 #[no_mangle]
 pub unsafe extern "C" fn peios_token_privileges(fd: c_int, out: *mut peios_privilege_set) -> c_int {
     query_into(fd, KACS_TOKEN_CLASS_PRIVILEGES, out)

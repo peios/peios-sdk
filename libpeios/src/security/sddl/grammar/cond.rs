@@ -39,9 +39,14 @@ impl core::fmt::Display for CondError {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
             CondError::Eof => write!(f, "unexpected end of input"),
-            CondError::Unexpected(c, off) => write!(f, "unexpected character {c:?} at offset {off}"),
+            CondError::Unexpected(c, off) => {
+                write!(f, "unexpected character {c:?} at offset {off}")
+            }
             CondError::UnknownToken(off, s) => {
-                write!(f, "unknown operator or token starting at offset {off}: {s:?}")
+                write!(
+                    f,
+                    "unknown operator or token starting at offset {off}: {s:?}"
+                )
             }
             CondError::BadLiteral(off, s) => write!(f, "invalid literal at offset {off}: {s}"),
             CondError::Unbalanced(s) => write!(f, "unbalanced delimiter: {s}"),
@@ -335,7 +340,7 @@ impl<'a> Parser<'a> {
         if hex.is_empty() {
             return Err(CondError::BadLiteral(self.pos, "empty octet".into()));
         }
-        if hex.len() % 2 != 0 {
+        if !hex.len().is_multiple_of(2) {
             return Err(CondError::BadLiteral(
                 self.pos,
                 "odd hex digit count".into(),

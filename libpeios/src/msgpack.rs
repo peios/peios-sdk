@@ -691,12 +691,20 @@ pub extern "C" fn peios_mp_writer_new() -> *mut peios_mp_writer {
 }
 
 /// `peios_mp_writer_free` — destroy a writer (NULL-safe).
+///
+/// # Safety
+/// `w` must be NULL or an exclusively owned writer from `peios_mp_writer_new` that has not been
+/// freed.
 #[no_mangle]
 pub unsafe extern "C" fn peios_mp_writer_free(w: *mut peios_mp_writer) {
     raw_free(w);
 }
 
 /// `peios_mp_writer_reset` — clear the buffer and the sticky error.
+///
+/// # Safety
+/// `w` must be NULL or a live writer from `peios_mp_writer_new`; mutable calls require exclusive
+/// access.
 #[no_mangle]
 pub unsafe extern "C" fn peios_mp_writer_reset(w: *mut peios_mp_writer) {
     if let Some(w) = w.as_mut() {
@@ -706,6 +714,10 @@ pub unsafe extern "C" fn peios_mp_writer_reset(w: *mut peios_mp_writer) {
 }
 
 /// `peios_mp_write_nil`.
+///
+/// # Safety
+/// `w` must be NULL or a live writer from `peios_mp_writer_new`; mutable calls require exclusive
+/// access.
 #[no_mangle]
 pub unsafe extern "C" fn peios_mp_write_nil(w: *mut peios_mp_writer) {
     if let Some(w) = w.as_mut() {
@@ -717,6 +729,10 @@ pub unsafe extern "C" fn peios_mp_write_nil(w: *mut peios_mp_writer) {
 }
 
 /// `peios_mp_write_bool`.
+///
+/// # Safety
+/// `w` must be NULL or a live writer from `peios_mp_writer_new`; mutable calls require exclusive
+/// access.
 #[no_mangle]
 pub unsafe extern "C" fn peios_mp_write_bool(w: *mut peios_mp_writer, v: bool) {
     if let Some(w) = w.as_mut() {
@@ -728,6 +744,10 @@ pub unsafe extern "C" fn peios_mp_write_bool(w: *mut peios_mp_writer, v: bool) {
 }
 
 /// `peios_mp_write_int` — a signed integer (smallest encoding).
+///
+/// # Safety
+/// `w` must be NULL or a live writer from `peios_mp_writer_new`; mutable calls require exclusive
+/// access.
 #[no_mangle]
 pub unsafe extern "C" fn peios_mp_write_int(w: *mut peios_mp_writer, v: i64) {
     if let Some(w) = w.as_mut() {
@@ -739,6 +759,10 @@ pub unsafe extern "C" fn peios_mp_write_int(w: *mut peios_mp_writer, v: i64) {
 }
 
 /// `peios_mp_write_uint` — an unsigned integer (smallest encoding).
+///
+/// # Safety
+/// `w` must be NULL or a live writer from `peios_mp_writer_new`; mutable calls require exclusive
+/// access.
 #[no_mangle]
 pub unsafe extern "C" fn peios_mp_write_uint(w: *mut peios_mp_writer, v: u64) {
     if let Some(w) = w.as_mut() {
@@ -750,6 +774,10 @@ pub unsafe extern "C" fn peios_mp_write_uint(w: *mut peios_mp_writer, v: u64) {
 }
 
 /// `peios_mp_write_float` — a 64-bit float.
+///
+/// # Safety
+/// `w` must be NULL or a live writer from `peios_mp_writer_new`; mutable calls require exclusive
+/// access.
 #[no_mangle]
 pub unsafe extern "C" fn peios_mp_write_float(w: *mut peios_mp_writer, v: f64) {
     if let Some(w) = w.as_mut() {
@@ -761,6 +789,10 @@ pub unsafe extern "C" fn peios_mp_write_float(w: *mut peios_mp_writer, v: f64) {
 }
 
 /// `peios_mp_write_str` — a UTF-8 string (rejected with EINVAL if not UTF-8).
+///
+/// # Safety
+/// `w` must be NULL or a live writer from `peios_mp_writer_new`; mutable calls require exclusive
+/// access. A non-null input buffer must remain readable for `len` bytes during the call.
 #[no_mangle]
 pub unsafe extern "C" fn peios_mp_write_str(w: *mut peios_mp_writer, s: *const c_char, len: usize) {
     if let Some(w) = w.as_mut() {
@@ -779,6 +811,10 @@ pub unsafe extern "C" fn peios_mp_write_str(w: *mut peios_mp_writer, s: *const c
 }
 
 /// `peios_mp_write_bin` — an opaque binary blob.
+///
+/// # Safety
+/// `w` must be NULL or a live writer from `peios_mp_writer_new`; mutable calls require exclusive
+/// access. A non-null input buffer must remain readable for `len` bytes during the call.
 #[no_mangle]
 pub unsafe extern "C" fn peios_mp_write_bin(w: *mut peios_mp_writer, b: *const c_void, len: usize) {
     if let Some(w) = w.as_mut() {
@@ -791,6 +827,10 @@ pub unsafe extern "C" fn peios_mp_write_bin(w: *mut peios_mp_writer, b: *const c
 }
 
 /// `peios_mp_write_array` — an array header; the caller then writes `count` values.
+///
+/// # Safety
+/// `w` must be NULL or a live writer from `peios_mp_writer_new`; mutable calls require exclusive
+/// access.
 #[no_mangle]
 pub unsafe extern "C" fn peios_mp_write_array(w: *mut peios_mp_writer, count: u32) {
     if let Some(w) = w.as_mut() {
@@ -802,6 +842,10 @@ pub unsafe extern "C" fn peios_mp_write_array(w: *mut peios_mp_writer, count: u3
 }
 
 /// `peios_mp_write_map` — a map header; the caller then writes `count` key/value pairs.
+///
+/// # Safety
+/// `w` must be NULL or a live writer from `peios_mp_writer_new`; mutable calls require exclusive
+/// access.
 #[no_mangle]
 pub unsafe extern "C" fn peios_mp_write_map(w: *mut peios_mp_writer, count: u32) {
     if let Some(w) = w.as_mut() {
@@ -813,6 +857,10 @@ pub unsafe extern "C" fn peios_mp_write_map(w: *mut peios_mp_writer, count: u32)
 }
 
 /// `peios_mp_write_ext` — an extension value with a signed type id.
+///
+/// # Safety
+/// `w` must be NULL or a live writer from `peios_mp_writer_new`; mutable calls require exclusive
+/// access. A non-null input buffer must remain readable for `len` bytes during the call.
 #[no_mangle]
 pub unsafe extern "C" fn peios_mp_write_ext(
     w: *mut peios_mp_writer,
@@ -831,6 +879,10 @@ pub unsafe extern "C" fn peios_mp_write_ext(
 
 /// `peios_mp_write_raw` — append pre-encoded MessagePack bytes verbatim (the
 /// escape hatch). The whole buffer is still structurally validated at `_bytes`.
+///
+/// # Safety
+/// `w` must be NULL or a live writer from `peios_mp_writer_new`; mutable calls require exclusive
+/// access. A non-null input buffer must remain readable for `len` bytes during the call.
 #[no_mangle]
 pub unsafe extern "C" fn peios_mp_write_raw(w: *mut peios_mp_writer, b: *const c_void, len: usize) {
     if let Some(w) = w.as_mut() {
@@ -846,6 +898,11 @@ pub unsafe extern "C" fn peios_mp_write_raw(w: *mut peios_mp_writer, b: *const c
 /// mutating call) and return its length, after confirming it is exactly one
 /// well-formed top-level value. `-1` + errno on a sticky error or malformed
 /// structure (e.g. an under-filled array/map).
+///
+/// # Safety
+/// `w` must be NULL or a live writer from `peios_mp_writer_new`; mutable calls require exclusive
+/// access. A non-null `out` must be writable for one pointer; borrowed bytes remain valid until
+/// the next mutation or free.
 #[no_mangle]
 pub unsafe extern "C" fn peios_mp_writer_bytes(
     w: *mut peios_mp_writer,
@@ -877,6 +934,10 @@ pub unsafe extern "C" fn peios_mp_writer_bytes(
 }
 
 /// `peios_mp_writer_error` — the latched errno, or 0 if healthy.
+///
+/// # Safety
+/// `w` must be NULL or a live writer from `peios_mp_writer_new`; mutable calls require exclusive
+/// access.
 #[no_mangle]
 pub unsafe extern "C" fn peios_mp_writer_error(w: *const peios_mp_writer) -> c_int {
     match w.as_ref() {
@@ -902,6 +963,10 @@ impl peios_mp_reader {
     fn error(&self) -> c_int {
         self._opaque[3] as c_int
     }
+    /// # Safety
+    /// The buffer recorded at initialization must still be live and immutable.
+    /// The internal lifetime is erased for C ABI borrowing; no resulting slice
+    /// may be used after the caller releases or changes that backing buffer.
     unsafe fn cursor(&self) -> Cursor<'static> {
         let ptr = self._opaque[0] as usize as *const u8;
         let len = self._opaque[1] as usize;
@@ -922,6 +987,10 @@ impl peios_mp_reader {
 
 /// `peios_mp_reader_init` — point a reader at `buf`/`len`. `buf == NULL` with a
 /// nonzero `len` latches `EINVAL` for later reader operations.
+///
+/// # Safety
+/// A non-null `r` must be writable for a reader. A non-null `buf` must remain readable and
+/// unmodified for `len` bytes throughout every use of the reader and any borrowed output.
 #[no_mangle]
 pub unsafe extern "C" fn peios_mp_reader_init(
     r: *mut peios_mp_reader,
@@ -939,6 +1008,10 @@ pub unsafe extern "C" fn peios_mp_reader_init(
 }
 
 /// `peios_mp_reader_remaining` — unconsumed bytes left in the buffer.
+///
+/// # Safety
+/// `r` must be NULL or initialized by `peios_mp_reader_init`; its input buffer must remain live
+/// and unmodified. Mutating reads require exclusive access to the reader.
 #[no_mangle]
 pub unsafe extern "C" fn peios_mp_reader_remaining(r: *const peios_mp_reader) -> usize {
     match r.as_ref() {
@@ -955,6 +1028,10 @@ pub unsafe extern "C" fn peios_mp_reader_remaining(r: *const peios_mp_reader) ->
 
 /// `peios_mp_peek` — the `peios_mp_type` of the next value without consuming it,
 /// or `-1` at end-of-input or on an invalid lead byte.
+///
+/// # Safety
+/// `r` must be NULL or initialized by `peios_mp_reader_init`; its input buffer must remain live
+/// and unmodified. Mutating reads require exclusive access to the reader.
 #[no_mangle]
 pub unsafe extern "C" fn peios_mp_peek(r: *const peios_mp_reader) -> c_int {
     let Some(r) = r.as_ref() else { return -1 };
@@ -993,6 +1070,10 @@ unsafe fn reader_read<T>(
 }
 
 /// `peios_mp_read_nil` — 0 on success, `-1`+EINVAL on a type mismatch.
+///
+/// # Safety
+/// `r` must be NULL or initialized by `peios_mp_reader_init`; its input buffer must remain live
+/// and unmodified. Mutating reads require exclusive access to the reader.
 #[no_mangle]
 pub unsafe extern "C" fn peios_mp_read_nil(r: *mut peios_mp_reader) -> c_int {
     match reader_read(r, |c| c.read_nil()) {
@@ -1002,6 +1083,12 @@ pub unsafe extern "C" fn peios_mp_read_nil(r: *mut peios_mp_reader) -> c_int {
 }
 
 /// `peios_mp_read_bool`.
+///
+/// # Safety
+/// `r` must be NULL or initialized by `peios_mp_reader_init`; its input buffer must remain live
+/// and unmodified. Mutating reads require exclusive access to the reader. Each non-null output
+/// pointer must be aligned and writable for its declared type; borrowed bytes retain the input
+/// buffer lifetime.
 #[no_mangle]
 pub unsafe extern "C" fn peios_mp_read_bool(r: *mut peios_mp_reader, out: *mut bool) -> c_int {
     match reader_read(r, |c| c.read_bool()) {
@@ -1016,6 +1103,12 @@ pub unsafe extern "C" fn peios_mp_read_bool(r: *mut peios_mp_reader, out: *mut b
 }
 
 /// `peios_mp_read_int` — any integer that fits `int64_t`.
+///
+/// # Safety
+/// `r` must be NULL or initialized by `peios_mp_reader_init`; its input buffer must remain live
+/// and unmodified. Mutating reads require exclusive access to the reader. Each non-null output
+/// pointer must be aligned and writable for its declared type; borrowed bytes retain the input
+/// buffer lifetime.
 #[no_mangle]
 pub unsafe extern "C" fn peios_mp_read_int(r: *mut peios_mp_reader, out: *mut i64) -> c_int {
     match reader_read(r, |c| c.read_i64()) {
@@ -1030,6 +1123,12 @@ pub unsafe extern "C" fn peios_mp_read_int(r: *mut peios_mp_reader, out: *mut i6
 }
 
 /// `peios_mp_read_uint` — any non-negative integer that fits `uint64_t`.
+///
+/// # Safety
+/// `r` must be NULL or initialized by `peios_mp_reader_init`; its input buffer must remain live
+/// and unmodified. Mutating reads require exclusive access to the reader. Each non-null output
+/// pointer must be aligned and writable for its declared type; borrowed bytes retain the input
+/// buffer lifetime.
 #[no_mangle]
 pub unsafe extern "C" fn peios_mp_read_uint(r: *mut peios_mp_reader, out: *mut u64) -> c_int {
     match reader_read(r, |c| c.read_u64()) {
@@ -1044,6 +1143,12 @@ pub unsafe extern "C" fn peios_mp_read_uint(r: *mut peios_mp_reader, out: *mut u
 }
 
 /// `peios_mp_read_float` — a float32 or float64, widened to `double`.
+///
+/// # Safety
+/// `r` must be NULL or initialized by `peios_mp_reader_init`; its input buffer must remain live
+/// and unmodified. Mutating reads require exclusive access to the reader. Each non-null output
+/// pointer must be aligned and writable for its declared type; borrowed bytes retain the input
+/// buffer lifetime.
 #[no_mangle]
 pub unsafe extern "C" fn peios_mp_read_float(r: *mut peios_mp_reader, out: *mut f64) -> c_int {
     match reader_read(r, |c| c.read_f64()) {
@@ -1059,6 +1164,12 @@ pub unsafe extern "C" fn peios_mp_read_float(r: *mut peios_mp_reader, out: *mut 
 
 /// `peios_mp_read_str` — borrow a string's bytes (a pointer into the reader's
 /// buffer); returns its length, or `-1`+EINVAL. Not NUL-terminated; use the length.
+///
+/// # Safety
+/// `r` must be NULL or initialized by `peios_mp_reader_init`; its input buffer must remain live
+/// and unmodified. Mutating reads require exclusive access to the reader. Each non-null output
+/// pointer must be aligned and writable for its declared type; borrowed bytes retain the input
+/// buffer lifetime.
 #[no_mangle]
 pub unsafe extern "C" fn peios_mp_read_str(
     r: *mut peios_mp_reader,
@@ -1081,6 +1192,12 @@ pub unsafe extern "C" fn peios_mp_read_str(
 }
 
 /// `peios_mp_read_bin` — borrow a binary blob's bytes; returns its length, or `-1`.
+///
+/// # Safety
+/// `r` must be NULL or initialized by `peios_mp_reader_init`; its input buffer must remain live
+/// and unmodified. Mutating reads require exclusive access to the reader. Each non-null output
+/// pointer must be aligned and writable for its declared type; borrowed bytes retain the input
+/// buffer lifetime.
 #[no_mangle]
 pub unsafe extern "C" fn peios_mp_read_bin(
     r: *mut peios_mp_reader,
@@ -1104,6 +1221,10 @@ pub unsafe extern "C" fn peios_mp_read_bin(
 
 /// `peios_mp_read_array` — consume an array header; returns the element count, or
 /// `-1`. The caller then reads that many values.
+///
+/// # Safety
+/// `r` must be NULL or initialized by `peios_mp_reader_init`; its input buffer must remain live
+/// and unmodified. Mutating reads require exclusive access to the reader.
 #[no_mangle]
 pub unsafe extern "C" fn peios_mp_read_array(r: *mut peios_mp_reader) -> isize {
     match reader_read(r, |c| c.read_array()) {
@@ -1114,6 +1235,10 @@ pub unsafe extern "C" fn peios_mp_read_array(r: *mut peios_mp_reader) -> isize {
 
 /// `peios_mp_read_map` — consume a map header; returns the key/value PAIR count,
 /// or `-1`. The caller then reads `2 × count` values (key, value, …).
+///
+/// # Safety
+/// `r` must be NULL or initialized by `peios_mp_reader_init`; its input buffer must remain live
+/// and unmodified. Mutating reads require exclusive access to the reader.
 #[no_mangle]
 pub unsafe extern "C" fn peios_mp_read_map(r: *mut peios_mp_reader) -> isize {
     match reader_read(r, |c| c.read_map()) {
@@ -1124,6 +1249,12 @@ pub unsafe extern "C" fn peios_mp_read_map(r: *mut peios_mp_reader) -> isize {
 
 /// `peios_mp_read_ext` — borrow an extension value's bytes and report its signed
 /// type id via `type_out`; returns the data length, or `-1`.
+///
+/// # Safety
+/// `r` must be NULL or initialized by `peios_mp_reader_init`; its input buffer must remain live
+/// and unmodified. Mutating reads require exclusive access to the reader. Each non-null output
+/// pointer must be aligned and writable for its declared type; borrowed bytes retain the input
+/// buffer lifetime.
 #[no_mangle]
 pub unsafe extern "C" fn peios_mp_read_ext(
     r: *mut peios_mp_reader,
@@ -1151,6 +1282,10 @@ pub unsafe extern "C" fn peios_mp_read_ext(
 
 /// `peios_mp_skip` — skip exactly one complete value (including nested
 /// containers). 0 on success, `-1`+EINVAL on malformed input.
+///
+/// # Safety
+/// `r` must be NULL or initialized by `peios_mp_reader_init`; its input buffer must remain live
+/// and unmodified. Mutating reads require exclusive access to the reader.
 #[no_mangle]
 pub unsafe extern "C" fn peios_mp_skip(r: *mut peios_mp_reader) -> c_int {
     match reader_read(r, |c| c.skip()) {
@@ -1168,6 +1303,9 @@ pub unsafe extern "C" fn peios_mp_skip(r: *mut peios_mp_reader) -> c_int {
 /// non-empty), matching the kernel's emit-time check. 0 if valid, `-1`+EINVAL
 /// otherwise. Pass `KMES_CONFIG_MAX_NESTING_DEPTH_DEFAULT` (32) for the default
 /// emit limit.
+///
+/// # Safety
+/// A non-null `buf` must remain readable and unmodified for `len` bytes throughout validation.
 #[no_mangle]
 pub unsafe extern "C" fn peios_mp_validate(
     buf: *const c_void,

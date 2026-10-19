@@ -1,4 +1,4 @@
-//! Vendored, pure-Rust SDDL text codec + ACE conditions + SD inheritance.
+//! Pure-Rust SDDL text codec + ACE conditions + SD inheritance.
 //!
 //! This subtree implements the userspace-only security-descriptor facilities
 //! that are *not* in the kernel/KACS binary ABI: the SDDL string grammar
@@ -32,13 +32,13 @@ pub(crate) mod wire_error;
 pub(crate) mod wire_sid;
 
 /// The on-wire SID primitive (lifted from the historical `libp-wire` crate),
-/// re-exported under one path so the vendored modules import it uniformly.
+/// re-exported under one path so the codec modules import it uniformly.
 pub(crate) mod wire {
     pub(crate) use super::wire_error::ParseError;
     pub(crate) use super::wire_sid::*;
 }
 
-/// Internal error for the vendored byte logic. The C ABI layer maps every
+/// Internal error for the byte codec. The C ABI layer maps every
 /// variant to `EINVAL` (malformed input); the textual detail is only used
 /// inside the codec (e.g. nested errors stringified into an `SddlError`).
 #[derive(Debug, Clone, PartialEq, Eq)]

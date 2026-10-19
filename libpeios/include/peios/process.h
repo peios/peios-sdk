@@ -15,9 +15,9 @@
 
 #include <stdint.h>
 
-#include <pkm/process.h>	/* KACS_PROCESS_* rights */
+#include <pkm/process.h> /* KACS_PROCESS_* rights */
 #include <pkm/psb.h>
-#include <pkm/sd.h>		/* struct kacs_generic_mapping */
+#include <pkm/sd.h> /* struct kacs_generic_mapping */
 
 #ifdef __cplusplus
 extern "C" {
@@ -36,10 +36,10 @@ int peios_process_set_mitigations(int pidfd, uint32_t mitigations);
  * A process's PSB, as /proc/<pid>/psb gives it.
  */
 struct peios_psb {
-	uint32_t	pip_type;	 /* 0 none, 512 Protected */
-	uint32_t	pip_trust;	 /* 8192 PeiosTcb */
-	uint32_t	mitigations;	 /* committed KACS_MIT_* bits */
-	uint8_t		process_guid[16]; /* in the order the kernel prints them */
+    uint32_t pip_type;        /* 0 none, 512 Protected */
+    uint32_t pip_trust;       /* 8192 PeiosTcb */
+    uint32_t mitigations;     /* committed KACS_MIT_* bits */
+    uint8_t process_guid[16]; /* in the order the kernel prints them */
 };
 
 /*

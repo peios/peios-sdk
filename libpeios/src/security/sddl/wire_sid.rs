@@ -16,9 +16,10 @@
 //   - `Sid::parse(&bytes)`    — convenience owned-form. Internally
 //     parses to `SidRef` then `to_owned()`s. Allocates one `Vec<u32>`.
 
-use crate::security::sddl::wire_error::ParseError;
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
+
+use crate::security::sddl::wire_error::ParseError;
 
 // ---------------------------------------------------------------------------
 // SID_AND_ATTRIBUTES group attribute bits.
@@ -169,7 +170,7 @@ impl<'a> SidRef<'a> {
     }
 
     /// Promote into an owned [`Sid`]. Allocates the subauthority vector.
-    pub fn to_owned(&self) -> Sid {
+    pub fn to_owned(self) -> Sid {
         Sid {
             revision: self.revision,
             authority: self.authority,

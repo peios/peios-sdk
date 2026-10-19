@@ -35,6 +35,7 @@
 //                              `AceRef::to_owned()` when ownership is needed.
 
 use alloc::vec::Vec;
+
 use crate::security::sddl::wire::ParseError;
 use crate::security::sddl::wire::{Sid, SidRef};
 
@@ -310,7 +311,7 @@ pub struct Ace {
 
 impl<'a> AceRef<'a> {
     /// Promote into an owned [`Ace`]. Allocates `body`.
-    pub fn to_owned(&self) -> Ace {
+    pub fn to_owned(self) -> Ace {
         Ace {
             ace_type: self.ace_type,
             flags: self.flags,

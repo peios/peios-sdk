@@ -15,9 +15,7 @@
 
 use core::ffi::c_int;
 
-use peios_uapi::{
-    reg_txn_status_args, REG_IOC_COMMIT, REG_IOC_TXN_STATUS, SYS_REG_BEGIN_TRANSACTION,
-};
+use peios_uapi::{reg_txn_status_args, REG_IOC_COMMIT, REG_IOC_TXN_STATUS, SYS_REG_BEGIN_TRANSACTION};
 
 use crate::sys::{ioctl, ret_int, syscall0};
 

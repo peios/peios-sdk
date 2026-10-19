@@ -16,6 +16,7 @@
 use alloc::boxed::Box;
 use alloc::string::String;
 use alloc::vec::Vec;
+
 use crate::security::sddl::wire::Sid;
 
 // ---------------------------------------------------------------------------
@@ -327,9 +328,7 @@ mod tests {
         emit_operand(&Operand::Int(-1), &mut out);
         assert_eq!(
             out,
-            vec![
-                0x04, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x02, 0x02
-            ]
+            vec![0x04, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x02, 0x02]
         );
     }
 

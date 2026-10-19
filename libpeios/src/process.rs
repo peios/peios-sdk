@@ -9,11 +9,10 @@
 use core::ffi::{c_char, c_int, c_long};
 
 use peios_uapi::{
-    kacs_generic_mapping, KACS_ACCESS_READ_CONTROL, KACS_ACCESS_WRITE_DAC,
-    KACS_ACCESS_WRITE_OWNER, KACS_PROCESS_DUP_HANDLE, KACS_PROCESS_QUERY_INFORMATION,
-    KACS_PROCESS_QUERY_LIMITED, KACS_PROCESS_SET_INFORMATION, KACS_PROCESS_SIGNAL,
-    KACS_PROCESS_SUSPEND_RESUME, KACS_PROCESS_TERMINATE, KACS_PROCESS_VM_READ,
-    KACS_PROCESS_VM_WRITE, SYS_KACS_SET_PSB,
+    kacs_generic_mapping, KACS_ACCESS_READ_CONTROL, KACS_ACCESS_WRITE_DAC, KACS_ACCESS_WRITE_OWNER,
+    KACS_PROCESS_DUP_HANDLE, KACS_PROCESS_QUERY_INFORMATION, KACS_PROCESS_QUERY_LIMITED,
+    KACS_PROCESS_SET_INFORMATION, KACS_PROCESS_SIGNAL, KACS_PROCESS_SUSPEND_RESUME,
+    KACS_PROCESS_TERMINATE, KACS_PROCESS_VM_READ, KACS_PROCESS_VM_WRITE, SYS_KACS_SET_PSB,
 };
 
 use crate::error::set_errno;
@@ -88,9 +87,9 @@ fn parse_psb(text: &[u8]) -> Option<peios_psb> {
     if mitigations.is_empty() || mitigations.len() > 8 {
         return None;
     }
-    let mitigations = mitigations.iter().try_fold(0u32, |n, &b| {
-        Some(n << 4 | (b as char).to_digit(16)?)
-    })?;
+    let mitigations = mitigations
+        .iter()
+        .try_fold(0u32, |n, &b| Some(n << 4 | (b as char).to_digit(16)?))?;
     let guid_text: alloc::vec::Vec<u8> = field(line, b"process_guid")?
         .iter()
         .copied()
@@ -106,24 +105,7 @@ fn parse_psb(text: &[u8]) -> Option<peios_psb> {
     })
 }
 
-/// `peios_process_psb` — read process `pid`'s PSB into `*out`.
-///
-/// `pid <= 0` reads the caller's own. Another process's needs
-/// `PROCESS_QUERY_LIMITED` on its descriptor and not PIP dominance, so a
-/// protected process's PIP is readable when nothing else about it is.
-///
-/// Returns 0, or `-1` with errno: whatever opening or reading the file said
-/// (`ENOENT` for a process that is gone, `EACCES` when refused), `EPROTO` for
-/// a line this library cannot read, `EINVAL` for a NULL `out`.
-///
-/// # Safety
-/// `out` must be NULL or writable.
-#[no_mangle]
-pub unsafe extern "C" fn peios_process_psb(pid: c_int, out: *mut peios_psb) -> c_int {
-    if out.is_null() {
-        set_errno(libc::EINVAL);
-        return -1;
-    }
+fn psb_path(pid: c_int) -> [u8; 32] {
     // "/proc/" + up to 10 digits + "/psb" + NUL, or "/proc/self/psb".
     let mut path = [0u8; 32];
     let mut len = 0;
@@ -149,6 +131,28 @@ pub unsafe extern "C" fn peios_process_psb(pid: c_int, out: *mut peios_psb) -> c
         push(&digits[i..]);
     }
     push(b"/psb\0");
+    path
+}
+
+/// `peios_process_psb` — read process `pid`'s PSB into `*out`.
+///
+/// `pid <= 0` reads the caller's own. Another process's needs
+/// `PROCESS_QUERY_LIMITED` on its descriptor and not PIP dominance, so a
+/// protected process's PIP is readable when nothing else about it is.
+///
+/// Returns 0, or `-1` with errno: whatever opening or reading the file said
+/// (`ENOENT` for a process that is gone, `EACCES` when refused), `EPROTO` for
+/// a line this library cannot read, `EINVAL` for a NULL `out`.
+///
+/// # Safety
+/// `out` must be NULL or writable.
+#[no_mangle]
+pub unsafe extern "C" fn peios_process_psb(pid: c_int, out: *mut peios_psb) -> c_int {
+    if out.is_null() {
+        set_errno(libc::EINVAL);
+        return -1;
+    }
+    let path = psb_path(pid);
     let text = match read_whole(path.as_ptr() as *const c_char) {
         Ok(text) => text,
         Err(errno) => {
@@ -166,6 +170,34 @@ pub unsafe extern "C" fn peios_process_psb(pid: c_int, out: *mut peios_psb) -> c
             -1
         }
     }
+}
+
+/// `peios_process_set_mitigations` — turn on process mitigation bits.
+///
+/// One-way: bits can only be set, never cleared. `mitigations` is a mask of
+/// `KACS_MIT_*` bits (`<pkm/psb.h>`); `pidfd == -1` targets the calling process,
+/// otherwise it is a real pidfd (targeting another process needs
+/// `PROCESS_SET_INFORMATION` on it plus PIP dominance). The call is
+/// activation-backed — a requested protection that cannot be activated fails
+/// closed without mutating anything — and the kernel validates the mask against
+/// `KACS_MIT_ALL` (and expands the `KACS_MIT_CFI` legacy alias). The mask is
+/// therefore passed straight through: client-side filtering would only risk
+/// diverging from the kernel's authoritative valid-bit set.
+///
+/// Returns 0 on success, `-1` with `errno` on failure (`EINVAL` for bits outside
+/// `KACS_MIT_ALL`, `ENODEV` when the requested CFI hardware is absent,
+/// `EACCES` / `ESRCH` for an inaccessible or missing target, …).
+///
+/// # Safety
+/// Crosses the syscall boundary but dereferences no userspace memory; `pidfd`
+/// must be `-1` or a valid pidfd.
+#[no_mangle]
+pub unsafe extern "C" fn peios_process_set_mitigations(pidfd: c_int, mitigations: u32) -> c_int {
+    ret_int(syscall2(
+        SYS_KACS_SET_PSB,
+        pidfd as c_long,
+        mitigations as c_long,
+    ))
 }
 
 #[cfg(test)]
@@ -199,37 +231,6 @@ mod tests {
               process_guid=00000000-0000-0000-0000-000000000000\n"
         )
         .is_none());
-        assert!(parse_psb(
-            b"pip_type=0 pip_trust=0 mitigations=0x0 process_guid=0011\n"
-        )
-        .is_none());
+        assert!(parse_psb(b"pip_type=0 pip_trust=0 mitigations=0x0 process_guid=0011\n").is_none());
     }
-}
-
-/// `peios_process_set_mitigations` — turn on process mitigation bits.
-///
-/// One-way: bits can only be set, never cleared. `mitigations` is a mask of
-/// `KACS_MIT_*` bits (`<pkm/psb.h>`); `pidfd == -1` targets the calling process,
-/// otherwise it is a real pidfd (targeting another process needs
-/// `PROCESS_SET_INFORMATION` on it plus PIP dominance). The call is
-/// activation-backed — a requested protection that cannot be activated fails
-/// closed without mutating anything — and the kernel validates the mask against
-/// `KACS_MIT_ALL` (and expands the `KACS_MIT_CFI` legacy alias). The mask is
-/// therefore passed straight through: client-side filtering would only risk
-/// diverging from the kernel's authoritative valid-bit set.
-///
-/// Returns 0 on success, `-1` with `errno` on failure (`EINVAL` for bits outside
-/// `KACS_MIT_ALL`, `ENODEV` when the requested CFI hardware is absent,
-/// `EACCES` / `ESRCH` for an inaccessible or missing target, …).
-///
-/// # Safety
-/// Crosses the syscall boundary but dereferences no userspace memory; `pidfd`
-/// must be `-1` or a valid pidfd.
-#[no_mangle]
-pub unsafe extern "C" fn peios_process_set_mitigations(pidfd: c_int, mitigations: u32) -> c_int {
-    ret_int(syscall2(
-        SYS_KACS_SET_PSB,
-        pidfd as c_long,
-        mitigations as c_long,
-    ))
 }

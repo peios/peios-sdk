@@ -26,7 +26,7 @@
 
 #include <stddef.h>
 #include <stdint.h>
-#include <sys/types.h>		/* ssize_t */
+#include <sys/types.h> /* ssize_t */
 
 #include <pkm/lcs.h>
 
@@ -48,8 +48,7 @@ extern "C" {
  * Returns a key fd whose granted access mask is fixed for its lifetime, or -1 with
  * errno: ENOENT, EACCES, EINVAL, ELOOP, ENAMETOOLONG, ETIMEDOUT, EIO, ENOMEM.
  */
-int peios_reg_open_key(int parent_fd, const char *path, uint32_t desired_access,
-		       uint32_t flags);
+int peios_reg_open_key(int parent_fd, const char *path, uint32_t desired_access, uint32_t flags);
 
 /*
  * peios_reg_create_key - open an existing key or create a new one.
@@ -65,9 +64,8 @@ int peios_reg_open_key(int parent_fd, const char *path, uint32_t desired_access,
  * Returns a key fd, or -1 with errno: ENOENT, EACCES, ENOSPC, EINVAL, EPERM
  * (privileged symlink creation), ENAMETOOLONG, ETIMEDOUT, EIO.
  */
-int peios_reg_create_key(int parent_fd, const char *path, uint32_t desired_access,
-			 uint32_t flags, const char *layer, int txn_fd,
-			 uint32_t *disposition_out);
+int peios_reg_create_key(int parent_fd, const char *path, uint32_t desired_access, uint32_t flags,
+                         const char *layer, int txn_fd, uint32_t *disposition_out);
 
 /* ====================================================================== */
 /* Values                                                                 */
@@ -92,14 +90,14 @@ int peios_reg_create_key(int parent_fd, const char *path, uint32_t desired_acces
  * resolved value's metadata (out). A NULL buffer with zero capacity probes its size.
  */
 struct peios_reg_value {
-	uint64_t	sequence;	/* out: effective entry's sequence number */
-	void	       *data;		/* in:  buffer for the value data (NULL to probe) */
-	void	       *layer;		/* in:  buffer for the layer name (NULL to probe/skip) */
-	uint32_t	type;		/* out: value type (REG_*) */
-	uint32_t	data_cap;	/* in:  data capacity */
-	uint32_t	data_len;	/* out: actual / required data length */
-	uint32_t	layer_cap;	/* in:  layer capacity */
-	uint32_t	layer_len;	/* out: actual / required layer-name length */
+    uint64_t sequence;  /* out: effective entry's sequence number */
+    void *data;         /* in:  buffer for the value data (NULL to probe) */
+    void *layer;        /* in:  buffer for the layer name (NULL to probe/skip) */
+    uint32_t type;      /* out: value type (REG_*) */
+    uint32_t data_cap;  /* in:  data capacity */
+    uint32_t data_len;  /* out: actual / required data length */
+    uint32_t layer_cap; /* in:  layer capacity */
+    uint32_t layer_len; /* out: actual / required layer-name length */
 };
 
 /*
@@ -112,7 +110,7 @@ struct peios_reg_value {
  * EACCES, EINVAL.
  */
 int peios_reg_query_value(int key_fd, const void *name, uint32_t name_len, int txn_fd,
-			  struct peios_reg_value *v);
+                          struct peios_reg_value *v);
 
 /*
  * peios_reg_set_value - write the value @name in a specific layer.
@@ -125,16 +123,16 @@ int peios_reg_query_value(int key_fd, const void *name, uint32_t name_len, int t
  * Returns 0, or -1 with errno: EINVAL, EAGAIN, ENOSPC, ENAMETOOLONG, EPERM, EACCES.
  */
 int peios_reg_set_value(int key_fd, const void *name, uint32_t name_len, uint32_t type,
-			const void *data, uint32_t data_len, const void *layer,
-			uint32_t layer_len, int txn_fd, uint64_t expected_seq);
+                        const void *data, uint32_t data_len, const void *layer, uint32_t layer_len,
+                        int txn_fd, uint64_t expected_seq);
 
 /*
  * peios_reg_delete_value - remove a layer's entry for the value @name (NULL/0 layer
  * = base). Idempotent; lower layers re-emerge. @txn_fd, or -1 to auto-commit.
  * Returns 0, or -1 with errno.
  */
-int peios_reg_delete_value(int key_fd, const void *name, uint32_t name_len,
-			   const void *layer, uint32_t layer_len, int txn_fd);
+int peios_reg_delete_value(int key_fd, const void *name, uint32_t name_len, const void *layer,
+                           uint32_t layer_len, int txn_fd);
 
 /*
  * peios_reg_blanket_tombstone - set (@set != 0) or clear (@set == 0) a blanket
@@ -142,8 +140,8 @@ int peios_reg_delete_value(int key_fd, const void *name, uint32_t name_len,
  * layer at once. @layer/@len name the layer (NULL/0 = base). @txn_fd, or -1.
  * Returns 0, or -1 with errno (EINVAL if @set is not 0/1, EACCES, …).
  */
-int peios_reg_blanket_tombstone(int key_fd, const void *layer, uint32_t layer_len,
-				int set, int txn_fd);
+int peios_reg_blanket_tombstone(int key_fd, const void *layer, uint32_t layer_len, int set,
+                                int txn_fd);
 
 /*
  * peios_reg_query_values_batch - read every effective value of @key_fd into @buf.
@@ -154,21 +152,21 @@ int peios_reg_blanket_tombstone(int key_fd, const void *layer, uint32_t layer_le
  *   [name_len: u32][name][type: u32][data_len: u32][data]
  * back to back, @count records. Returns 0, or -1 with errno (ERANGE if @cap small).
  */
-int peios_reg_query_values_batch(int key_fd, int txn_fd, void *buf, uint32_t cap,
-				 uint32_t *len_out, uint32_t *count_out);
+int peios_reg_query_values_batch(int key_fd, int txn_fd, void *buf, uint32_t cap, uint32_t *len_out,
+                                 uint32_t *count_out);
 
 /*
  * Descriptor for peios_reg_enum_value: name and data buffers (in) plus the value at
  * the requested index (out). A NULL buffer with zero capacity probes its size.
  */
 struct peios_reg_enum_value {
-	void	       *name;		/* in:  buffer for the value name (NULL to probe) */
-	void	       *data;		/* in:  buffer for the value data (NULL to probe) */
-	uint32_t	type;		/* out: value type (REG_*) */
-	uint32_t	name_cap;	/* in:  name capacity */
-	uint32_t	name_len;	/* out: actual / required name length */
-	uint32_t	data_cap;	/* in:  data capacity */
-	uint32_t	data_len;	/* out: actual / required data length */
+    void *name;        /* in:  buffer for the value name (NULL to probe) */
+    void *data;        /* in:  buffer for the value data (NULL to probe) */
+    uint32_t type;     /* out: value type (REG_*) */
+    uint32_t name_cap; /* in:  name capacity */
+    uint32_t name_len; /* out: actual / required name length */
+    uint32_t data_cap; /* in:  data capacity */
+    uint32_t data_len; /* out: actual / required data length */
 };
 
 /*
@@ -176,8 +174,7 @@ struct peios_reg_enum_value {
  * key's tombstone-resolved values; walk from 0 until ENOENT). @txn_fd, or -1.
  * Returns 0, or -1 with errno (ENOENT past the end, ERANGE, …).
  */
-int peios_reg_enum_value(int key_fd, uint32_t index, int txn_fd,
-			 struct peios_reg_enum_value *v);
+int peios_reg_enum_value(int key_fd, uint32_t index, int txn_fd, struct peios_reg_enum_value *v);
 
 /* ====================================================================== */
 /* Subkeys, metadata, watches                                             */
@@ -189,12 +186,12 @@ int peios_reg_enum_value(int key_fd, uint32_t index, int txn_fd,
  * NULL with nonzero capacity is EINVAL.
  */
 struct peios_reg_subkey {
-	void	       *name;		/* in:  buffer for the child's name (NULL to probe) */
-	uint64_t	last_write_time;/* out: ns since the Unix epoch */
-	uint32_t	name_cap;	/* in:  name capacity */
-	uint32_t	name_len;	/* out: actual / required name length */
-	uint32_t	subkey_count;	/* out: the child's subkey count */
-	uint32_t	value_count;	/* out: the child's value count */
+    void *name;               /* in:  buffer for the child's name (NULL to probe) */
+    uint64_t last_write_time; /* out: ns since the Unix epoch */
+    uint32_t name_cap;        /* in:  name capacity */
+    uint32_t name_len;        /* out: actual / required name length */
+    uint32_t subkey_count;    /* out: the child's subkey count */
+    uint32_t value_count;     /* out: the child's value count */
 };
 
 /*
@@ -202,8 +199,7 @@ struct peios_reg_subkey {
  * walk from 0 until ENOENT). No per-child access check. @txn_fd, or -1. A too-small
  * name buffer returns ERANGE with the required name_len. Returns 0, or -1 with errno.
  */
-int peios_reg_enum_subkey(int key_fd, uint32_t index, int txn_fd,
-			  struct peios_reg_subkey *v);
+int peios_reg_enum_subkey(int key_fd, uint32_t index, int txn_fd, struct peios_reg_subkey *v);
 
 /*
  * Descriptor for peios_reg_query_key_info: a name buffer (in) plus the key's
@@ -212,19 +208,19 @@ int peios_reg_enum_subkey(int key_fd, uint32_t index, int txn_fd,
  * A NULL name buffer with nonzero capacity is EINVAL.
  */
 struct peios_reg_key_info {
-	void	       *name;		/* in:  buffer for the key's leaf name (NULL to probe) */
-	uint64_t	last_write_time;	/* out */
-	uint64_t	hive_generation;	/* out: per-hive change epoch */
-	uint32_t	name_cap;		/* in:  name capacity */
-	uint32_t	name_len;		/* out: actual / required name length */
-	uint32_t	subkey_count;		/* out */
-	uint32_t	value_count;		/* out */
-	uint32_t	max_subkey_name_len;	/* out */
-	uint32_t	max_value_name_len;	/* out */
-	uint32_t	max_value_data_size;	/* out */
-	uint32_t	sd_size;		/* out: security-descriptor size */
-	uint8_t		volatile_key;		/* out: 1 if volatile */
-	uint8_t		symlink;		/* out: 1 if a symlink */
+    void *name;                   /* in:  buffer for the key's leaf name (NULL to probe) */
+    uint64_t last_write_time;     /* out */
+    uint64_t hive_generation;     /* out: per-hive change epoch */
+    uint32_t name_cap;            /* in:  name capacity */
+    uint32_t name_len;            /* out: actual / required name length */
+    uint32_t subkey_count;        /* out */
+    uint32_t value_count;         /* out */
+    uint32_t max_subkey_name_len; /* out */
+    uint32_t max_value_name_len;  /* out */
+    uint32_t max_value_data_size; /* out */
+    uint32_t sd_size;             /* out: security-descriptor size */
+    uint8_t volatile_key;         /* out: 1 if volatile */
+    uint8_t symlink;              /* out: 1 if a symlink */
 };
 
 /*
@@ -271,11 +267,11 @@ int peios_reg_flush(int key_fd);
  * peios_reg_get_security - read the @security_info components of the key's SD into
  * @sd (KACS binary format), writing the length to *@sd_len_out (may be NULL). A
  * too-small buffer returns -1/ERANGE with the required size there (a zero @cap
- * probes). A NULL @sd with nonzero @cap is EINVAL. Owner/group/DACL need READ_CONTROL; the SACL needs
- * ACCESS_SYSTEM_SECURITY. Returns 0, or -1 with errno.
+ * probes). A NULL @sd with nonzero @cap is EINVAL. Owner/group/DACL need
+ * READ_CONTROL; the SACL needs ACCESS_SYSTEM_SECURITY. Returns 0, or -1 with errno.
  */
 int peios_reg_get_security(int key_fd, uint32_t security_info, void *sd, uint32_t cap,
-			   uint32_t *sd_len_out);
+                           uint32_t *sd_len_out);
 
 /*
  * peios_reg_set_security - apply the @security_info components of @sd (a KACS binary
@@ -284,8 +280,8 @@ int peios_reg_get_security(int key_fd, uint32_t security_info, void *sd, uint32_
  * ACCESS_SYSTEM_SECURITY. @txn_fd gives atomicity (not layer qualification), or -1
  * to apply immediately. SD changes affect only future opens. Returns 0, or -1+errno.
  */
-int peios_reg_set_security(int key_fd, uint32_t security_info, const void *sd,
-			   uint32_t sd_len, int txn_fd);
+int peios_reg_set_security(int key_fd, uint32_t security_info, const void *sd, uint32_t sd_len,
+                           int txn_fd);
 
 /* ====================================================================== */
 /* Backup / restore                                                       */

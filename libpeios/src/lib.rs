@@ -1,7 +1,7 @@
 //! libpeios — the Peios userspace C ABI library.
 //!
 //! A `no_std`, `panic = "abort"` cdylib/staticlib: thin `extern "C"` shims layered on
-//! the shared C-ABI substrate `peios-cabi`, over `kacs-core` (`pkm-core`),
+//! the shared C-ABI substrate `peios-cabi`, over the kernel-owned `kacs-core`,
 //! `peios-uapi`, and `libc`, exposing the Peios kernel↔userspace boundary as
 //! `<peios/*.h>`. The surface spans all three
 //! subsystems — KACS access control (`<peios/{security,token,access,file,
@@ -74,7 +74,6 @@ core::arch::global_asm!(
     "mov eax, 3",
     "ret",
     ".size rust_eh_personality, . - rust_eh_personality",
-
     ".hidden _Unwind_Resume",
     ".globl _Unwind_Resume",
     ".type _Unwind_Resume, @function",

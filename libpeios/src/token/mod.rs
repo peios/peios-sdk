@@ -3,7 +3,7 @@
 //! This module has two halves. The token-spec [`builder`] is pure userspace byte
 //! assembly (the 192-byte-header wire format consumed by `kacs_create_token`) and
 //! is unit-tested here. The fd-returning calls (open/query/adjust/duplicate/…)
-//! are syscall-backed and land once the KACS invocation layer exists; they are
+//! are syscall-backed; they are
 //! exercised live under Provium rather than in `cargo test`.
 
 #![allow(non_upper_case_globals)]

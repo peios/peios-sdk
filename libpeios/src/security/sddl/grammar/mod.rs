@@ -48,7 +48,6 @@ use crate::security::sddl::codec::{
     SecurityDescriptor,
 };
 use crate::security::sddl::wire::{Sid, SidRef};
-
 use crate::security::sddl::build::{AceBuilder, AclBuilder, SdBuilder};
 use crate::security::sddl::claims::{ClaimAttribute, ClaimValue};
 use crate::security::sddl::condition::Condition;
@@ -530,8 +529,8 @@ pub fn parse_ace(s: &str) -> Result<AceBuilder> {
 /// Format a single ACE as an SDDL `(...)` group, including the outer
 /// parentheses.
 pub fn format_ace(ace: &AceRef<'_>) -> Result<String> {
-    let type_code =
-        vocab::ace_code_from_type(ace.ace_type).ok_or(SddlError::Format("ACE type has no SDDL code"))?;
+    let type_code = vocab::ace_code_from_type(ace.ace_type)
+        .ok_or(SddlError::Format("ACE type has no SDDL code"))?;
 
     let mut out = String::new();
     out.push('(');

@@ -101,6 +101,10 @@ unsafe fn load<'a>(view: *const c_void) -> &'a [u8] {
 
 /// Write a `(ptr, len)` pair back through two optional out-params, in the
 /// convention shared by the SID-yielding accessors.
+///
+/// # Safety
+/// Non-NULL output pointers must be aligned and writable; `s` must outlive
+/// every use of the returned pointer.
 unsafe fn yield_slice(s: &[u8], out: *mut *const c_void, len: *mut usize) {
     if !out.is_null() {
         *out = s.as_ptr() as *const c_void;
@@ -121,6 +125,11 @@ fn acl_fully_valid(acl: &Acl) -> bool {
 // ----------------------------------------------------------------------------
 
 /// `peios_sd_parse` — validate a self-relative SD and populate `out`.
+///
+/// # Safety
+/// Non-NULL input must be readable for `len` bytes. Non-NULL `out` must be
+/// aligned, exclusively writable view storage. The input must remain alive and
+/// unmodified for as long as the resulting view or any derived view is used.
 #[no_mangle]
 pub unsafe extern "C" fn peios_sd_parse(
     sd: *const c_void,
@@ -151,6 +160,11 @@ pub unsafe extern "C" fn peios_sd_parse(
 }
 
 /// `peios_sd_view_control` — the SD control word.
+///
+/// # Safety
+/// Non-NULL views must come from a successful parse, with their backing bytes
+/// alive and unmodified. Non-NULL output pointers must be aligned and writable.
+/// Returned pointers borrow the original buffer and have the same lifetime.
 #[no_mangle]
 pub unsafe extern "C" fn peios_sd_view_control(v: *const peios_sd_view) -> u16 {
     SecurityDescriptor::parse(load(v as *const c_void))
@@ -159,6 +173,11 @@ pub unsafe extern "C" fn peios_sd_view_control(v: *const peios_sd_view) -> u16 {
 }
 
 /// `peios_sd_view_owner` — the owner SID, or `-1` if absent.
+///
+/// # Safety
+/// Non-NULL views must come from a successful parse, with their backing bytes
+/// alive and unmodified. Non-NULL output pointers must be aligned and writable.
+/// Returned pointers borrow the original buffer and have the same lifetime.
 #[no_mangle]
 pub unsafe extern "C" fn peios_sd_view_owner(
     v: *const peios_sd_view,
@@ -182,6 +201,11 @@ pub unsafe extern "C" fn peios_sd_view_owner(
 }
 
 /// `peios_sd_view_group` — the primary-group SID, or `-1` if absent.
+///
+/// # Safety
+/// Non-NULL views must come from a successful parse, with their backing bytes
+/// alive and unmodified. Non-NULL output pointers must be aligned and writable.
+/// Returned pointers borrow the original buffer and have the same lifetime.
 #[no_mangle]
 pub unsafe extern "C" fn peios_sd_view_group(
     v: *const peios_sd_view,
@@ -205,6 +229,11 @@ pub unsafe extern "C" fn peios_sd_view_group(
 }
 
 /// `peios_sd_view_dacl` — the DACL, or `-1` if absent or NULL.
+///
+/// # Safety
+/// Non-NULL views must come from a successful parse, with their backing bytes
+/// alive and unmodified. Non-NULL output pointers must be aligned and writable.
+/// Returned pointers borrow the original buffer and have the same lifetime.
 #[no_mangle]
 pub unsafe extern "C" fn peios_sd_view_dacl(
     v: *const peios_sd_view,
@@ -214,6 +243,11 @@ pub unsafe extern "C" fn peios_sd_view_dacl(
 }
 
 /// `peios_sd_view_sacl` — the SACL, or `-1` if absent.
+///
+/// # Safety
+/// Non-NULL views must come from a successful parse, with their backing bytes
+/// alive and unmodified. Non-NULL output pointers must be aligned and writable.
+/// Returned pointers borrow the original buffer and have the same lifetime.
 #[no_mangle]
 pub unsafe extern "C" fn peios_sd_view_sacl(
     v: *const peios_sd_view,
@@ -223,6 +257,10 @@ pub unsafe extern "C" fn peios_sd_view_sacl(
 }
 
 /// Shared body of the DACL/SACL accessors.
+///
+/// # Safety
+/// A non-NULL input view must borrow live, unchanged bytes. A non-NULL output
+/// must be aligned and exclusively writable view storage.
 unsafe fn sd_acl(
     v: *const peios_sd_view,
     out: *mut peios_acl_view,
@@ -249,6 +287,11 @@ unsafe fn sd_acl(
 // ----------------------------------------------------------------------------
 
 /// `peios_acl_parse` — validate a bare ACL and populate `out`.
+///
+/// # Safety
+/// Non-NULL input must be readable for `len` bytes. Non-NULL `out` must be
+/// aligned, exclusively writable view storage. The input must remain alive and
+/// unmodified for as long as the resulting view or any derived view is used.
 #[no_mangle]
 pub unsafe extern "C" fn peios_acl_parse(
     acl: *const c_void,
@@ -272,6 +315,11 @@ pub unsafe extern "C" fn peios_acl_parse(
 }
 
 /// `peios_acl_view_count` — the number of ACEs.
+///
+/// # Safety
+/// Non-NULL views must come from a successful parse, with their backing bytes
+/// alive and unmodified. Non-NULL output pointers must be aligned and writable.
+/// Returned pointers borrow the original buffer and have the same lifetime.
 #[no_mangle]
 pub unsafe extern "C" fn peios_acl_view_count(a: *const peios_acl_view) -> c_uint {
     Acl::parse(load(a as *const c_void))
@@ -280,6 +328,11 @@ pub unsafe extern "C" fn peios_acl_view_count(a: *const peios_acl_view) -> c_uin
 }
 
 /// `peios_acl_view_ace` — populate `out` for ACE `i`, or `-1` (`ERANGE`).
+///
+/// # Safety
+/// Non-NULL views must come from a successful parse, with their backing bytes
+/// alive and unmodified. Non-NULL output pointers must be aligned and writable.
+/// Returned pointers borrow the original buffer and have the same lifetime.
 #[no_mangle]
 pub unsafe extern "C" fn peios_acl_view_ace(
     a: *const peios_acl_view,
@@ -314,23 +367,42 @@ pub unsafe extern "C" fn peios_acl_view_ace(
 // ----------------------------------------------------------------------------
 
 /// Parse the ACE recorded in a view; `None` only on the (validated-away) error.
+///
+/// # Safety
+/// A non-NULL view must hold a previously validated ACE and borrow unchanged,
+/// live backing bytes for the returned lifetime.
 unsafe fn ace_of<'a>(e: *const peios_ace_view) -> Option<Ace<'a>> {
     Ace::parse(load(e as *const c_void)).ok()
 }
 
 /// `peios_ace_view_type` — the ACE type byte.
+///
+/// # Safety
+/// Non-NULL views must come from a successful parse, with their backing bytes
+/// alive and unmodified. Non-NULL output pointers must be aligned and writable.
+/// Returned pointers borrow the original buffer and have the same lifetime.
 #[no_mangle]
 pub unsafe extern "C" fn peios_ace_view_type(e: *const peios_ace_view) -> u8 {
     ace_of(e).map(|a| a.ace_type()).unwrap_or(0)
 }
 
 /// `peios_ace_view_flags` — the ACE flags byte.
+///
+/// # Safety
+/// Non-NULL views must come from a successful parse, with their backing bytes
+/// alive and unmodified. Non-NULL output pointers must be aligned and writable.
+/// Returned pointers borrow the original buffer and have the same lifetime.
 #[no_mangle]
 pub unsafe extern "C" fn peios_ace_view_flags(e: *const peios_ace_view) -> u8 {
     ace_of(e).map(|a| a.ace_flags()).unwrap_or(0)
 }
 
 /// `peios_ace_view_mask` — the access mask (0 for an opaque ACE).
+///
+/// # Safety
+/// Non-NULL views must come from a successful parse, with their backing bytes
+/// alive and unmodified. Non-NULL output pointers must be aligned and writable.
+/// Returned pointers borrow the original buffer and have the same lifetime.
 #[no_mangle]
 pub unsafe extern "C" fn peios_ace_view_mask(e: *const peios_ace_view) -> u32 {
     match ace_of(e).map(|a| a.kind()) {
@@ -346,6 +418,11 @@ pub unsafe extern "C" fn peios_ace_view_mask(e: *const peios_ace_view) -> u32 {
 }
 
 /// `peios_ace_view_sid` — the trustee SID, or `-1` for an opaque ACE.
+///
+/// # Safety
+/// Non-NULL views must come from a successful parse, with their backing bytes
+/// alive and unmodified. Non-NULL output pointers must be aligned and writable.
+/// Returned pointers borrow the original buffer and have the same lifetime.
 #[no_mangle]
 pub unsafe extern "C" fn peios_ace_view_sid(
     e: *const peios_ace_view,
@@ -369,6 +446,11 @@ pub unsafe extern "C" fn peios_ace_view_sid(
 }
 
 /// `peios_ace_view_object_type` — the object-type GUID, or `-1` if absent.
+///
+/// # Safety
+/// Non-NULL views must come from a successful parse, with their backing bytes
+/// alive and unmodified. Non-NULL output pointers must be aligned and writable.
+/// Returned pointers borrow the original buffer and have the same lifetime.
 #[no_mangle]
 pub unsafe extern "C" fn peios_ace_view_object_type(
     e: *const peios_ace_view,
@@ -383,6 +465,11 @@ pub unsafe extern "C" fn peios_ace_view_object_type(
 }
 
 /// `peios_ace_view_inherited_object_type` — the inherited object-type GUID.
+///
+/// # Safety
+/// Non-NULL views must come from a successful parse, with their backing bytes
+/// alive and unmodified. Non-NULL output pointers must be aligned and writable.
+/// Returned pointers borrow the original buffer and have the same lifetime.
 #[no_mangle]
 pub unsafe extern "C" fn peios_ace_view_inherited_object_type(
     e: *const peios_ace_view,
@@ -402,6 +489,10 @@ pub unsafe extern "C" fn peios_ace_view_inherited_object_type(
 }
 
 /// Shared body of the two object-GUID accessors.
+///
+/// # Safety
+/// A non-NULL input view must borrow live, unchanged bytes. A non-NULL output
+/// must be aligned and writable; the returned GUID borrows the view buffer.
 unsafe fn object_guid(
     e: *const peios_ace_view,
     guid16: *mut *const u8,
@@ -419,6 +510,11 @@ unsafe fn object_guid(
 }
 
 /// `peios_ace_view_app_data` — trailing callback / resource-attribute data.
+///
+/// # Safety
+/// Non-NULL views must come from a successful parse, with their backing bytes
+/// alive and unmodified. Non-NULL output pointers must be aligned and writable.
+/// Returned pointers borrow the original buffer and have the same lifetime.
 #[no_mangle]
 pub unsafe extern "C" fn peios_ace_view_app_data(
     e: *const peios_ace_view,
@@ -488,6 +584,11 @@ fn sid_array_valid(blob: &[u8]) -> bool {
 }
 
 /// `peios_sid_array_parse` — validate a SID-and-attributes blob, populate `out`.
+///
+/// # Safety
+/// Non-NULL input must be readable for `len` bytes. Non-NULL `out` must be
+/// aligned, exclusively writable view storage. The input must remain alive and
+/// unmodified for as long as the resulting view or any derived view is used.
 #[no_mangle]
 pub unsafe extern "C" fn peios_sid_array_parse(
     blob: *const c_void,
@@ -508,12 +609,22 @@ pub unsafe extern "C" fn peios_sid_array_parse(
 }
 
 /// `peios_sid_array_count` — the number of entries.
+///
+/// # Safety
+/// Non-NULL views must come from a successful parse, with their backing bytes
+/// alive and unmodified. Non-NULL output pointers must be aligned and writable.
+/// Returned pointers borrow the original buffer and have the same lifetime.
 #[no_mangle]
 pub unsafe extern "C" fn peios_sid_array_count(a: *const peios_sid_array_view) -> c_uint {
     sid_array_count_of(load(a as *const c_void))
 }
 
 /// `peios_sid_array_get` — the SID, length, and attributes of entry `i`.
+///
+/// # Safety
+/// Non-NULL views must come from a successful parse, with their backing bytes
+/// alive and unmodified. Non-NULL output pointers must be aligned and writable.
+/// Returned pointers borrow the original buffer and have the same lifetime.
 #[no_mangle]
 pub unsafe extern "C" fn peios_sid_array_get(
     a: *const peios_sid_array_view,

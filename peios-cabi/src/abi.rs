@@ -22,7 +22,9 @@ use crate::error::set_errno;
 /// - otherwise: copy all of `src` and return its length.
 ///
 /// # Safety
-/// `out` must be valid for `cap` bytes when `cap != 0`.
+/// `out` must be NULL or valid for `cap` writable bytes when `cap != 0`.
+/// A non-null destination must not overlap the source, and must be exclusively
+/// writable for the duration of the call.
 pub unsafe fn emit_bytes(src: &[u8], out: *mut u8, cap: usize) -> isize {
     let need = src.len();
     if cap == 0 {
@@ -48,7 +50,9 @@ pub unsafe fn emit_bytes(src: &[u8], out: *mut u8, cap: usize) -> isize {
 /// caller allocates `s.len() + 1`).
 ///
 /// # Safety
-/// `out` must be valid for `cap` bytes when `cap != 0`.
+/// `out` must be NULL or valid for `cap` writable bytes when `cap != 0`.
+/// A non-null destination must not overlap the source, and must be exclusively
+/// writable for the duration of the call.
 pub unsafe fn emit_str(s: &[u8], out: *mut c_char, cap: usize) -> isize {
     let need = s.len(); // excluding the NUL
     if cap == 0 {
@@ -80,10 +84,16 @@ pub unsafe fn emit_str(s: &[u8], out: *mut c_char, cap: usize) -> isize {
 /// Lets us render a `Display` value (e.g. a SID's SDDL string) without touching
 /// the allocator. The buffer is generously sized for the longest possible SID
 /// string (`S-1-<48-bit auth>` plus 15 ten-digit sub-authorities ~= 184 bytes);
-/// an overrun latches and surfaces as a `core::fmt::Error` to the caller.
+/// an overrun returns `core::fmt::Error` without appending that fragment.
 pub struct StackWriter {
     buf: [u8; Self::CAP],
     len: usize,
+}
+
+impl Default for StackWriter {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl StackWriter {
@@ -155,6 +165,8 @@ pub unsafe fn raw_free<T>(raw: *mut T) {
 
 /// Append `data` to `vec`, reserving fallibly first. `Err(())` signals an
 /// out-of-memory condition the caller maps to `ENOMEM` — we never abort on OOM.
+// Allocation failure is the only error; C ABI consumers translate it to ENOMEM.
+#[allow(clippy::result_unit_err)]
 pub fn try_extend(vec: &mut Vec<u8>, data: &[u8]) -> Result<(), ()> {
     vec.try_reserve(data.len()).map_err(|_| ())?;
     vec.extend_from_slice(data);
@@ -170,6 +182,8 @@ pub fn u32_len(n: usize) -> Result<u32, c_int> {
 }
 
 /// Fallibly copy `bytes` into a fresh owned `Vec`. `Err(())` on OOM.
+// Preserve the shared allocation-only error contract used by the ABI wrappers.
+#[allow(clippy::result_unit_err)]
 pub fn to_vec(bytes: &[u8]) -> Result<Vec<u8>, ()> {
     let mut v = Vec::new();
     try_extend(&mut v, bytes)?;
@@ -181,6 +195,7 @@ pub fn to_vec(bytes: &[u8]) -> Result<Vec<u8>, ()> {
 ///
 /// # Safety
 /// `ptr` must be non-null and readable up to the NUL (or at least `max` bytes).
+/// That memory must remain live and unmodified for the returned slice's lifetime.
 pub unsafe fn cstr_bytes<'a>(ptr: *const c_char, max: usize) -> Option<&'a [u8]> {
     let mut len = 0;
     while len < max {
@@ -285,7 +300,10 @@ mod tests {
     fn emit_str_empty_needs_one_byte_for_the_nul() {
         assert_eq!(unsafe { emit_str(b"", core::ptr::null_mut(), 0) }, 0);
         let mut buf = [0xAAu8; 1];
-        assert_eq!(unsafe { emit_str(b"", buf.as_mut_ptr() as *mut c_char, 1) }, 0);
+        assert_eq!(
+            unsafe { emit_str(b"", buf.as_mut_ptr() as *mut c_char, 1) },
+            0
+        );
         assert_eq!(buf[0], 0);
     }
 
@@ -320,7 +338,10 @@ mod tests {
     #[test]
     fn cstr_bytes_unterminated_within_max_is_none() {
         let buf = b"abcd"; // no NUL in the first 4 bytes
-        assert_eq!(unsafe { cstr_bytes(buf.as_ptr() as *const c_char, 4) }, None);
+        assert_eq!(
+            unsafe { cstr_bytes(buf.as_ptr() as *const c_char, 4) },
+            None
+        );
     }
 
     #[test]

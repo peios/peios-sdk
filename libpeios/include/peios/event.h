@@ -19,7 +19,7 @@
 
 #include <stddef.h>
 #include <stdint.h>
-#include <sys/types.h>		/* ssize_t */
+#include <sys/types.h> /* ssize_t */
 
 #include <pkm/kmes.h>
 
@@ -42,15 +42,15 @@ extern "C" {
  * type or malformed payload), ENOSPC (exceeds the size caps), EAGAIN
  * (rate-limited), EFAULT (bad pointer).
  */
-int peios_event_emit(const char *event_type, uint16_t event_type_len,
-		     const void *payload, uint32_t payload_len);
+int peios_event_emit(const char *event_type, uint16_t event_type_len, const void *payload,
+                     uint32_t payload_len);
 
 /* One entry of a batch emit. */
 struct peios_event_entry {
-	const char     *event_type;	/* length-counted UTF-8; not NUL-terminated */
-	uint16_t	event_type_len;
-	const void     *payload;	/* MessagePack bytes */
-	uint32_t	payload_len;
+    const char *event_type; /* length-counted UTF-8; not NUL-terminated */
+    uint16_t event_type_len;
+    const void *payload; /* MessagePack bytes */
+    uint32_t payload_len;
 };
 
 /*
@@ -64,8 +64,8 @@ struct peios_event_entry {
  * that failed (with *emitted_out set to how many preceded it). Rate-limiting is
  * all-or-nothing: EAGAIN emits none.
  */
-int peios_event_emit_batch(const struct peios_event_entry *entries,
-			   uint32_t count, uint32_t *emitted_out);
+int peios_event_emit_batch(const struct peios_event_entry *entries, uint32_t count,
+                           uint32_t *emitted_out);
 
 /* ====================================================================== */
 /* Emission policy (PGSS §6.9)                                            */
@@ -94,10 +94,10 @@ int peios_event_emit_batch(const struct peios_event_entry *entries,
  * until the policy becomes readable. A handle is for one thread at a time, and
  * not for use across fork(): the child opens its own.
  */
-#define PEIOS_EVENT_TIER_ESSENTIAL	0u	/* always on; never consults the policy */
-#define PEIOS_EVENT_TIER_STANDARD	1u	/* on unless switched off */
-#define PEIOS_EVENT_TIER_VERBOSE	2u	/* off unless switched on */
-#define PEIOS_EVENT_TIER_DEBUG		3u	/* off unless switched on */
+#define PEIOS_EVENT_TIER_ESSENTIAL 0u /* always on; never consults the policy */
+#define PEIOS_EVENT_TIER_STANDARD 1u  /* on unless switched off */
+#define PEIOS_EVENT_TIER_VERBOSE 2u   /* off unless switched on */
+#define PEIOS_EVENT_TIER_DEBUG 3u     /* off unless switched on */
 
 typedef struct peios_event_policy peios_event_policy;
 
@@ -122,7 +122,7 @@ void peios_event_policy_close(peios_event_policy *policy);
  * trouble never fails a decision; it falls back to the tier.
  */
 int peios_event_policy_enabled(peios_event_policy *policy, const char *event_type,
-			       uint16_t event_type_len, uint32_t tier);
+                               uint16_t event_type_len, uint32_t tier);
 
 /* ====================================================================== */
 /* Consume (consumer side)                                                */
@@ -136,17 +136,17 @@ int peios_event_policy_enabled(peios_event_policy *policy, const char *event_typ
  * @origin_class: 0 = userspace, 1 = KMES, 2 = KACS, 3 = LCS.
  */
 struct peios_event {
-	uint64_t	timestamp;	/* ns since the Unix epoch (CLOCK_REALTIME) */
-	uint64_t	sequence;	/* per-CPU, per-boot monotonic (gap = lost events) */
-	uint16_t	cpu_id;
-	uint8_t		origin_class;
-	uint8_t		effective_token_guid[16];
-	uint8_t		true_token_guid[16];
-	uint8_t		process_guid[16];
-	const char     *event_type;	/* not NUL-terminated; use event_type_len */
-	uint16_t	event_type_len;
-	const void     *payload;
-	uint32_t	payload_len;
+    uint64_t timestamp; /* ns since the Unix epoch (CLOCK_REALTIME) */
+    uint64_t sequence;  /* per-CPU, per-boot monotonic (gap = lost events) */
+    uint16_t cpu_id;
+    uint8_t origin_class;
+    uint8_t effective_token_guid[16];
+    uint8_t true_token_guid[16];
+    uint8_t process_guid[16];
+    const char *event_type; /* not NUL-terminated; use event_type_len */
+    uint16_t event_type_len;
+    const void *payload;
+    uint32_t payload_len;
 };
 
 /*
@@ -183,7 +183,7 @@ typedef struct peios_event_reader peios_event_reader;
 
 /* Attach to @cpu_id and map its ring, ready to drain. NULL with errno on failure. */
 peios_event_reader *peios_event_reader_open(uint32_t cpu_id);
-void		    peios_event_reader_close(peios_event_reader *r);
+void peios_event_reader_close(peios_event_reader *r);
 
 /*
  * Fetch the next event into @out. Returns 1 (event filled), 0 (none available —
@@ -210,18 +210,18 @@ uint64_t peios_event_reader_lost(const peios_event_reader *r);
  * free-running byte counters; an event lives at (read_pos & (capacity - 1)).
  */
 struct peios_event_ring {
-	uint64_t _opaque[4];
+    uint64_t _opaque[4];
 };
 
 /* Map (and validate) a ring fd from peios_event_attach. @ring must be zeroed or
  * previously unmapped; remapping an active ring fails with EBUSY. 0, or -1 with
  * errno. */
-int  peios_event_ring_map(int fd, uint64_t capacity, struct peios_event_ring *ring);
+int peios_event_ring_map(int fd, uint64_t capacity, struct peios_event_ring *ring);
 void peios_event_ring_unmap(struct peios_event_ring *ring);
 
 uint64_t peios_event_ring_capacity(const struct peios_event_ring *ring);
-uint64_t peios_event_ring_write_pos(const struct peios_event_ring *ring);	/* acquire */
-uint64_t peios_event_ring_tail_pos(const struct peios_event_ring *ring);		/* acquire */
+uint64_t peios_event_ring_write_pos(const struct peios_event_ring *ring); /* acquire */
+uint64_t peios_event_ring_tail_pos(const struct peios_event_ring *ring);  /* acquire */
 uint64_t peios_event_ring_generation(const struct peios_event_ring *ring);
 
 /* Arm (@set != 0) or clear the advisory wake flag before sleeping. */
@@ -233,13 +233,12 @@ void peios_event_ring_set_need_wake(const struct peios_event_ring *ring, int set
  * is in [tail_pos, write_pos). @out may be NULL to validate the slot and return
  * the byte size without borrowing event_type/payload pointers.
  */
-ssize_t peios_event_ring_event_at(const struct peios_event_ring *ring,
-				  uint64_t read_pos, struct peios_event *out);
+ssize_t peios_event_ring_event_at(const struct peios_event_ring *ring, uint64_t read_pos,
+                                  struct peios_event *out);
 
 /* Futex wait until events past @read_pos may be available or @timeout_ms elapses
  * (negative = forever). 1 (drain now), 0 (timeout / interrupted), or -1. */
-int peios_event_ring_wait(const struct peios_event_ring *ring,
-			  uint64_t read_pos, int timeout_ms);
+int peios_event_ring_wait(const struct peios_event_ring *ring, uint64_t read_pos, int timeout_ms);
 
 #ifdef __cplusplus
 }

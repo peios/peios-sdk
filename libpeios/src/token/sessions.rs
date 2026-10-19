@@ -13,8 +13,9 @@
 
 #![allow(non_camel_case_types)]
 
-use alloc::vec::Vec;
 use core::ffi::{c_char, c_int};
+
+use alloc::vec::Vec;
 
 use peios_cabi::abi::{raw_free, raw_new};
 
@@ -112,7 +113,12 @@ pub extern "C" fn peios_logon_sessions_open() -> *mut peios_logon_sessions {
     };
     // SAFETY: paired with raw_free in peios_logon_sessions_close.
     let reader = unsafe {
-        raw_new(peios_logon_sessions { text, at: 0, sid: Vec::new(), package: Vec::new() })
+        raw_new(peios_logon_sessions {
+            text,
+            at: 0,
+            sid: Vec::new(),
+            package: Vec::new(),
+        })
     };
     if reader.is_null() {
         set_errno(libc::ENOMEM);
@@ -183,7 +189,12 @@ mod tests {
     use super::*;
 
     fn reader(text: &[u8]) -> peios_logon_sessions {
-        peios_logon_sessions { text: text.to_vec(), at: 0, sid: Vec::new(), package: Vec::new() }
+        peios_logon_sessions {
+            text: text.to_vec(),
+            at: 0,
+            sid: Vec::new(),
+            package: Vec::new(),
+        }
     }
 
     #[test]

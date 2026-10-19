@@ -34,7 +34,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <stdbool.h>
-#include <sys/types.h>		/* ssize_t */
+#include <sys/types.h> /* ssize_t */
 
 #include <pkm/sid.h>
 #include <pkm/sd.h>
@@ -50,32 +50,32 @@ extern "C" {
 /* Largest encoded SID, i.e. KACS_SID_BYTE_LEN(KACS_SID_MAX_SUB_AUTHORITIES).
  * A buffer of this size always holds any valid SID; the SID helpers below
  * never require a two-call probe. */
-#define PEIOS_SID_MAX_BYTES	68u
+#define PEIOS_SID_MAX_BYTES 68u
 
 /* Well-known SIDs, selected by peios_sid_well_known(). */
 enum peios_wks {
-	PEIOS_WKS_NULL = 0,		/* S-1-0-0   Nobody                  */
-	PEIOS_WKS_EVERYONE,		/* S-1-1-0   World                   */
-	PEIOS_WKS_LOCAL,		/* S-1-2-0   Local                   */
-	PEIOS_WKS_CREATOR_OWNER,	/* S-1-3-0                           */
-	PEIOS_WKS_CREATOR_GROUP,	/* S-1-3-1                           */
-	PEIOS_WKS_OWNER_RIGHTS,		/* S-1-3-4   suppresses owner WRITE_DAC */
-	PEIOS_WKS_ANONYMOUS,		/* S-1-5-7                           */
-	PEIOS_WKS_SELF,			/* S-1-5-10  PRINCIPAL_SELF          */
-	PEIOS_WKS_AUTHENTICATED_USERS,	/* S-1-5-11                          */
-	PEIOS_WKS_SYSTEM,		/* S-1-5-18  Local System            */
-	PEIOS_WKS_LOCAL_SERVICE,	/* S-1-5-19                          */
-	PEIOS_WKS_NETWORK_SERVICE,	/* S-1-5-20                          */
-	PEIOS_WKS_ADMINISTRATORS,	/* S-1-5-32-544                      */
+    PEIOS_WKS_NULL = 0,            /* S-1-0-0   Nobody                  */
+    PEIOS_WKS_EVERYONE,            /* S-1-1-0   World                   */
+    PEIOS_WKS_LOCAL,               /* S-1-2-0   Local                   */
+    PEIOS_WKS_CREATOR_OWNER,       /* S-1-3-0                           */
+    PEIOS_WKS_CREATOR_GROUP,       /* S-1-3-1                           */
+    PEIOS_WKS_OWNER_RIGHTS,        /* S-1-3-4   suppresses owner WRITE_DAC */
+    PEIOS_WKS_ANONYMOUS,           /* S-1-5-7                           */
+    PEIOS_WKS_SELF,                /* S-1-5-10  PRINCIPAL_SELF          */
+    PEIOS_WKS_AUTHENTICATED_USERS, /* S-1-5-11                          */
+    PEIOS_WKS_SYSTEM,              /* S-1-5-18  Local System            */
+    PEIOS_WKS_LOCAL_SERVICE,       /* S-1-5-19                          */
+    PEIOS_WKS_NETWORK_SERVICE,     /* S-1-5-20                          */
+    PEIOS_WKS_ADMINISTRATORS,      /* S-1-5-32-544                      */
 };
 
 /* Integrity-level RIDs (the sub-authority of an S-1-16-x label SID). */
 enum peios_integrity_level {
-	PEIOS_IL_UNTRUSTED = 0,
-	PEIOS_IL_LOW	   = 4096,
-	PEIOS_IL_MEDIUM	   = 8192,
-	PEIOS_IL_HIGH	   = 12288,
-	PEIOS_IL_SYSTEM	   = 16384,
+    PEIOS_IL_UNTRUSTED = 0,
+    PEIOS_IL_LOW = 4096,
+    PEIOS_IL_MEDIUM = 8192,
+    PEIOS_IL_HIGH = 12288,
+    PEIOS_IL_SYSTEM = 16384,
 };
 
 /*
@@ -85,8 +85,8 @@ enum peios_integrity_level {
  * @count:        0..KACS_SID_MAX_SUB_AUTHORITIES.
  * Returns the encoded length, or -1 (EINVAL bad count; ERANGE @cap too small).
  */
-ssize_t peios_sid_build(void *out, size_t cap, uint64_t id_authority,
-			const uint32_t *sub_auths, unsigned count);
+ssize_t peios_sid_build(void *out, size_t cap, uint64_t id_authority, const uint32_t *sub_auths,
+                        unsigned count);
 
 /* Parse the SDDL string form ("S-1-5-21-…") into a binary SID. */
 ssize_t peios_sid_parse_string(void *out, size_t cap, const char *sddl);
@@ -127,8 +127,7 @@ uint32_t peios_sid_rid(const void *sid, size_t len);
  * per-class mappings are published as peios_file_generic_mapping (<peios/file.h>)
  * and peios_token_generic_mapping (<peios/token.h>).
  */
-uint32_t peios_access_map_generic(uint32_t mask,
-				  const struct kacs_generic_mapping *m);
+uint32_t peios_access_map_generic(uint32_t mask, const struct kacs_generic_mapping *m);
 
 /* ====================================================================== */
 /* ACL construction                                                       */
@@ -144,40 +143,39 @@ uint32_t peios_access_map_generic(uint32_t mask,
  * @sid is the trustee; @mask is the access mask; @flags are KACS_ACE_FLAG_*.
  */
 struct peios_ace_spec {
-	uint8_t		type;		/* KACS_ACE_TYPE_*  */
-	uint8_t		flags;		/* KACS_ACE_FLAG_*  */
-	uint32_t	mask;
-	const void     *sid;
-	size_t		sid_len;
-	const uint8_t  *object_type;		/* 16 bytes, or NULL */
-	const uint8_t  *inherited_object_type;	/* 16 bytes, or NULL */
-	const void     *app_data;
-	size_t		app_data_len;
+    uint8_t type;  /* KACS_ACE_TYPE_*  */
+    uint8_t flags; /* KACS_ACE_FLAG_*  */
+    uint32_t mask;
+    const void *sid;
+    size_t sid_len;
+    const uint8_t *object_type;           /* 16 bytes, or NULL */
+    const uint8_t *inherited_object_type; /* 16 bytes, or NULL */
+    const void *app_data;
+    size_t app_data_len;
 };
 
 typedef struct peios_acl_builder peios_acl_builder;
 
 /* Create / destroy an ACL builder. _new() returns NULL on allocation failure. */
 peios_acl_builder *peios_acl_builder_new(void);
-void		   peios_acl_builder_free(peios_acl_builder *b);
+void peios_acl_builder_free(peios_acl_builder *b);
 
 /* Drop all accumulated ACEs and clear the sticky error, reusing the builder. */
 void peios_acl_builder_reset(peios_acl_builder *b);
 
 /* Convenience adders for the common single-SID families. @flags is usually 0
  * (inheritance flags apply to container/inheritable ACEs). */
-void peios_acl_builder_allow(peios_acl_builder *b, const void *sid, size_t len,
-			     uint32_t mask, uint8_t flags);
-void peios_acl_builder_deny(peios_acl_builder *b, const void *sid, size_t len,
-			    uint32_t mask, uint8_t flags);
-void peios_acl_builder_audit(peios_acl_builder *b, const void *sid, size_t len,
-			     uint32_t mask, uint8_t flags);
+void peios_acl_builder_allow(peios_acl_builder *b, const void *sid, size_t len, uint32_t mask,
+                             uint8_t flags);
+void peios_acl_builder_deny(peios_acl_builder *b, const void *sid, size_t len, uint32_t mask,
+                            uint8_t flags);
+void peios_acl_builder_audit(peios_acl_builder *b, const void *sid, size_t len, uint32_t mask,
+                             uint8_t flags);
 
 /* Append a SYSTEM_MANDATORY_LABEL ACE for integrity level S-1-16-<rid>.
  * @policy_mask is a mask of the KACS_SYSTEM_MANDATORY_LABEL_NO_{READ,WRITE,
  * EXECUTE}_UP bits (from <pkm/sd.h>). */
-void peios_acl_builder_label(peios_acl_builder *b, uint32_t integrity_rid,
-			     uint32_t policy_mask);
+void peios_acl_builder_label(peios_acl_builder *b, uint32_t integrity_rid, uint32_t policy_mask);
 
 /* Append an arbitrary ACE (object / callback / resource-attribute families). */
 void peios_acl_builder_add(peios_acl_builder *b, const struct peios_ace_spec *ace);
@@ -189,7 +187,7 @@ void peios_acl_builder_add(peios_acl_builder *b, const struct peios_ace_spec *ac
  * peios_acl_builder_finish() copies it out, getxattr-style.
  */
 const void *peios_acl_builder_bytes(peios_acl_builder *b, size_t *len_out);
-ssize_t	    peios_acl_builder_finish(peios_acl_builder *b, void *buf, size_t cap);
+ssize_t peios_acl_builder_finish(peios_acl_builder *b, void *buf, size_t cap);
 
 /* The latched error (an errno), or 0 if the builder is still healthy. */
 int peios_acl_builder_error(const peios_acl_builder *b);
@@ -201,8 +199,8 @@ int peios_acl_builder_error(const peios_acl_builder *b);
 typedef struct peios_sd_builder peios_sd_builder;
 
 peios_sd_builder *peios_sd_builder_new(void);
-void		  peios_sd_builder_free(peios_sd_builder *b);
-void		  peios_sd_builder_reset(peios_sd_builder *b);
+void peios_sd_builder_free(peios_sd_builder *b);
+void peios_sd_builder_reset(peios_sd_builder *b);
 
 /* Owner / group SIDs. Omit a call to leave the component absent (so an SD built
  * to set only some components via kacs_set_sd carries only what you set). */
@@ -231,8 +229,8 @@ void peios_sd_builder_sacl(peios_sd_builder *b, const void *acl, size_t len);
 /* Borrow the serialized SD; @len_out may be NULL if the caller only needs the
  * pointer. peios_sd_builder_finish() copies it out, getxattr-style. */
 const void *peios_sd_builder_bytes(peios_sd_builder *b, size_t *len_out);
-ssize_t	    peios_sd_builder_finish(peios_sd_builder *b, void *buf, size_t cap);
-int	    peios_sd_builder_error(const peios_sd_builder *b);
+ssize_t peios_sd_builder_finish(peios_sd_builder *b, void *buf, size_t cap);
+int peios_sd_builder_error(const peios_sd_builder *b);
 
 /* ====================================================================== */
 /* Parsing — zero-copy views                                              */
@@ -245,13 +243,21 @@ int	    peios_sd_builder_error(const peios_sd_builder *b);
  * implementation. Every accessor that yields a SID/ACL/blob hands back a
  * pointer *into the original buffer*, so that buffer must outlive the view.
  */
-typedef struct peios_sd_view	    { uint64_t _opaque[8]; } peios_sd_view;
-typedef struct peios_acl_view	    { uint64_t _opaque[4]; } peios_acl_view;
-typedef struct peios_ace_view	    { uint64_t _opaque[4]; } peios_ace_view;
-typedef struct peios_sid_array_view { uint64_t _opaque[4]; } peios_sid_array_view;
+typedef struct peios_sd_view {
+    uint64_t _opaque[8];
+} peios_sd_view;
+typedef struct peios_acl_view {
+    uint64_t _opaque[4];
+} peios_acl_view;
+typedef struct peios_ace_view {
+    uint64_t _opaque[4];
+} peios_ace_view;
+typedef struct peios_sid_array_view {
+    uint64_t _opaque[4];
+} peios_sid_array_view;
 
 /* Validate a self-relative SD and populate @out. Returns 0, or -1 (EINVAL). */
-int	 peios_sd_parse(const void *sd, size_t len, peios_sd_view *out);
+int peios_sd_parse(const void *sd, size_t len, peios_sd_view *out);
 uint16_t peios_sd_view_control(const peios_sd_view *v);
 /* Component accessors: 0 with @sid and @len set on success; -1 if the component
  * is absent (for the DACL/SACL, -1 also distinguishes a NULL DACL). */
@@ -261,32 +267,29 @@ int peios_sd_view_dacl(const peios_sd_view *v, peios_acl_view *out);
 int peios_sd_view_sacl(const peios_sd_view *v, peios_acl_view *out);
 
 /* Parse a bare ACL (e.g. a token default DACL) directly. Returns 0 / -1. */
-int	 peios_acl_parse(const void *acl, size_t len, peios_acl_view *out);
+int peios_acl_parse(const void *acl, size_t len, peios_acl_view *out);
 unsigned peios_acl_view_count(const peios_acl_view *a);
 /* Populate @out for ACE @i (0-based, in stored order). Returns 0 / -1 (ERANGE). */
-int	 peios_acl_view_ace(const peios_acl_view *a, unsigned i, peios_ace_view *out);
+int peios_acl_view_ace(const peios_acl_view *a, unsigned i, peios_ace_view *out);
 
-uint8_t	 peios_ace_view_type(const peios_ace_view *e);
-uint8_t	 peios_ace_view_flags(const peios_ace_view *e);
+uint8_t peios_ace_view_type(const peios_ace_view *e);
+uint8_t peios_ace_view_flags(const peios_ace_view *e);
 uint32_t peios_ace_view_mask(const peios_ace_view *e);
-int	 peios_ace_view_sid(const peios_ace_view *e, const void **sid, size_t *len);
+int peios_ace_view_sid(const peios_ace_view *e, const void **sid, size_t *len);
 /* Object-ACE GUID(s); 0 with *guid16 set, -1 if not present / not an object ACE. */
-int	 peios_ace_view_object_type(const peios_ace_view *e, const uint8_t **guid16);
-int	 peios_ace_view_inherited_object_type(const peios_ace_view *e,
-					      const uint8_t **guid16);
+int peios_ace_view_object_type(const peios_ace_view *e, const uint8_t **guid16);
+int peios_ace_view_inherited_object_type(const peios_ace_view *e, const uint8_t **guid16);
 /* Trailing application data of callback / resource-attribute ACEs. */
-int	 peios_ace_view_app_data(const peios_ace_view *e, const void **data,
-				 size_t *len);
+int peios_ace_view_app_data(const peios_ace_view *e, const void **data, size_t *len);
 
 /*
  * SID-and-attributes arrays — the [count][sid_len][sid][attrs]… blobs returned
  * by the token GROUPS / RESTRICTED_SIDS / DEVICE_GROUPS / CAPABILITIES classes.
  */
-int	 peios_sid_array_parse(const void *blob, size_t len,
-			       peios_sid_array_view *out);
+int peios_sid_array_parse(const void *blob, size_t len, peios_sid_array_view *out);
 unsigned peios_sid_array_count(const peios_sid_array_view *a);
-int	 peios_sid_array_get(const peios_sid_array_view *a, unsigned i,
-			     const void **sid, size_t *len, uint32_t *attrs);
+int peios_sid_array_get(const peios_sid_array_view *a, unsigned i, const void **sid, size_t *len,
+                        uint32_t *attrs);
 
 /* ====================================================================== */
 /* SDDL text codec + SD inheritance                                       */
@@ -358,19 +361,16 @@ ssize_t peios_sddl_format_condition(char *out, size_t cap, const void *artx, siz
  * generic rights as written. @info: the lists to re-propagate.
  * Returns the new child SD byte length, or -1 (EINVAL; ERANGE).
  */
-ssize_t peios_sd_reinherit_ex(void *out, size_t cap, const void *parent_sd,
-			      size_t parent_len, const void *child_sd,
-			      size_t child_len, int is_container,
-			      const struct kacs_generic_mapping *mapping,
-			      uint32_t info);
+ssize_t peios_sd_reinherit_ex(void *out, size_t cap, const void *parent_sd, size_t parent_len,
+                              const void *child_sd, size_t child_len, int is_container,
+                              const struct kacs_generic_mapping *mapping, uint32_t info);
 
 /*
  * peios_sd_reinherit - peios_sd_reinherit_ex with no generic mapping, for the
  * DACL alone (DACL_SECURITY_INFORMATION). A protected DACL is left as it is.
  */
-ssize_t peios_sd_reinherit(void *out, size_t cap, const void *parent_sd,
-			   size_t parent_len, const void *child_sd,
-			   size_t child_len, int is_container);
+ssize_t peios_sd_reinherit(void *out, size_t cap, const void *parent_sd, size_t parent_len,
+                           const void *child_sd, size_t child_len, int is_container);
 
 /*
  * peios_sd_strip_inherited - drop ACEs carrying ACE_FLAG_INHERITED from the
@@ -382,8 +382,8 @@ ssize_t peios_sd_reinherit(void *out, size_t cap, const void *parent_sd,
  * @sd / @sd_len: the SD bytes. @info: *_SECURITY_INFORMATION selector mask.
  * Returns the resulting SD byte length, or -1 (EINVAL; ERANGE).
  */
-ssize_t peios_sd_strip_inherited(void *out, size_t cap, const void *sd,
-				 size_t sd_len, uint32_t info);
+ssize_t peios_sd_strip_inherited(void *out, size_t cap, const void *sd, size_t sd_len,
+                                 uint32_t info);
 
 #ifdef __cplusplus
 }

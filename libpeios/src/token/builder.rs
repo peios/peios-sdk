@@ -340,12 +340,20 @@ pub extern "C" fn peios_token_builder_new() -> *mut peios_token_builder {
 }
 
 /// `peios_token_builder_free` — destroy a builder (NULL-safe).
+///
+/// # Safety
+/// `b` must be NULL or an exclusively owned builder from `peios_token_builder_new` that has not
+/// already been freed.
 #[no_mangle]
 pub unsafe extern "C" fn peios_token_builder_free(b: *mut peios_token_builder) {
     raw_free(b);
 }
 
 /// `peios_token_builder_reset` — clear all fields and the sticky error.
+///
+/// # Safety
+/// `b` must be NULL or a live builder returned by `peios_token_builder_new`; mutable calls
+/// require exclusive access.
 #[no_mangle]
 pub unsafe extern "C" fn peios_token_builder_reset(b: *mut peios_token_builder) {
     if let Some(b) = b.as_mut() {
@@ -358,6 +366,10 @@ pub unsafe extern "C" fn peios_token_builder_reset(b: *mut peios_token_builder) 
 // ----------------------------------------------------------------------------
 
 /// `peios_token_builder_user` — set the user SID.
+///
+/// # Safety
+/// `b` must be NULL or a live builder returned by `peios_token_builder_new`; mutable calls
+/// require exclusive access. A non-null `sid` must be readable for `len` bytes.
 #[no_mangle]
 pub unsafe extern "C" fn peios_token_builder_user(
     b: *mut peios_token_builder,
@@ -379,6 +391,10 @@ pub unsafe extern "C" fn peios_token_builder_user(
 }
 
 /// `peios_token_builder_add_group` — append a group (SID + attributes).
+///
+/// # Safety
+/// `b` must be NULL or a live builder returned by `peios_token_builder_new`; mutable calls
+/// require exclusive access. A non-null `sid` must be readable for `len` bytes.
 #[no_mangle]
 pub unsafe extern "C" fn peios_token_builder_add_group(
     b: *mut peios_token_builder,
@@ -397,6 +413,10 @@ pub unsafe extern "C" fn peios_token_builder_add_group(
 }
 
 /// `peios_token_builder_privileges` — set the present/enabled privilege words.
+///
+/// # Safety
+/// `b` must be NULL or a live builder returned by `peios_token_builder_new`; mutable calls
+/// require exclusive access.
 #[no_mangle]
 pub unsafe extern "C" fn peios_token_builder_privileges(
     b: *mut peios_token_builder,
@@ -417,6 +437,10 @@ pub unsafe extern "C" fn peios_token_builder_privileges(
 /// including Identification and Anonymous, without changing the primary's
 /// own identity. Older kernels reject primary levels below Impersonation.
 /// DuplicateToken retains its separate floor for primary results (§3.2.4).
+///
+/// # Safety
+/// `b` must be NULL or a live builder returned by `peios_token_builder_new`; mutable calls
+/// require exclusive access.
 #[no_mangle]
 pub unsafe extern "C" fn peios_token_builder_type(
     b: *mut peios_token_builder,
@@ -432,6 +456,10 @@ pub unsafe extern "C" fn peios_token_builder_type(
 }
 
 /// `peios_token_builder_integrity` — set the integrity-level RID.
+///
+/// # Safety
+/// `b` must be NULL or a live builder returned by `peios_token_builder_new`; mutable calls
+/// require exclusive access.
 #[no_mangle]
 pub unsafe extern "C" fn peios_token_builder_integrity(b: *mut peios_token_builder, rid: u32) {
     if let Some(b) = b.as_mut() {
@@ -442,6 +470,10 @@ pub unsafe extern "C" fn peios_token_builder_integrity(b: *mut peios_token_build
 }
 
 /// `peios_token_builder_session` — set the LogonSession id.
+///
+/// # Safety
+/// `b` must be NULL or a live builder returned by `peios_token_builder_new`; mutable calls
+/// require exclusive access.
 #[no_mangle]
 pub unsafe extern "C" fn peios_token_builder_session(b: *mut peios_token_builder, session_id: u64) {
     if let Some(b) = b.as_mut() {
@@ -452,6 +484,10 @@ pub unsafe extern "C" fn peios_token_builder_session(b: *mut peios_token_builder
 }
 
 /// `peios_token_builder_owner_index` — set the owner SID index.
+///
+/// # Safety
+/// `b` must be NULL or a live builder returned by `peios_token_builder_new`; mutable calls
+/// require exclusive access.
 #[no_mangle]
 pub unsafe extern "C" fn peios_token_builder_owner_index(b: *mut peios_token_builder, index: u32) {
     if let Some(b) = b.as_mut() {
@@ -462,6 +498,10 @@ pub unsafe extern "C" fn peios_token_builder_owner_index(b: *mut peios_token_bui
 }
 
 /// `peios_token_builder_primary_group_index` — set the primary-group index.
+///
+/// # Safety
+/// `b` must be NULL or a live builder returned by `peios_token_builder_new`; mutable calls
+/// require exclusive access.
 #[no_mangle]
 pub unsafe extern "C" fn peios_token_builder_primary_group_index(
     b: *mut peios_token_builder,
@@ -475,6 +515,10 @@ pub unsafe extern "C" fn peios_token_builder_primary_group_index(
 }
 
 /// `peios_token_builder_default_dacl` — set the default DACL from ACL bytes.
+///
+/// # Safety
+/// `b` must be NULL or a live builder returned by `peios_token_builder_new`; mutable calls
+/// require exclusive access. A non-null `acl` must be readable for `len` bytes.
 #[no_mangle]
 pub unsafe extern "C" fn peios_token_builder_default_dacl(
     b: *mut peios_token_builder,
@@ -499,6 +543,10 @@ pub unsafe extern "C" fn peios_token_builder_default_dacl(
 // ----------------------------------------------------------------------------
 
 /// `peios_token_builder_mandatory_policy` — set the mandatory-policy bits.
+///
+/// # Safety
+/// `b` must be NULL or a live builder returned by `peios_token_builder_new`; mutable calls
+/// require exclusive access.
 #[no_mangle]
 pub unsafe extern "C" fn peios_token_builder_mandatory_policy(
     b: *mut peios_token_builder,
@@ -512,6 +560,10 @@ pub unsafe extern "C" fn peios_token_builder_mandatory_policy(
 }
 
 /// `peios_token_builder_projected_ids` — set the projected uid/gid.
+///
+/// # Safety
+/// `b` must be NULL or a live builder returned by `peios_token_builder_new`; mutable calls
+/// require exclusive access.
 #[no_mangle]
 pub unsafe extern "C" fn peios_token_builder_projected_ids(
     b: *mut peios_token_builder,
@@ -527,6 +579,10 @@ pub unsafe extern "C" fn peios_token_builder_projected_ids(
 }
 
 /// `peios_token_builder_expiration` — set the expiration timestamp.
+///
+/// # Safety
+/// `b` must be NULL or a live builder returned by `peios_token_builder_new`; mutable calls
+/// require exclusive access.
 #[no_mangle]
 pub unsafe extern "C" fn peios_token_builder_expiration(b: *mut peios_token_builder, when: u64) {
     if let Some(b) = b.as_mut() {
@@ -537,6 +593,11 @@ pub unsafe extern "C" fn peios_token_builder_expiration(b: *mut peios_token_buil
 }
 
 /// `peios_token_builder_source` — set the 8-byte source name and source id.
+///
+/// # Safety
+/// `b` must be NULL or a live builder returned by `peios_token_builder_new`; mutable calls
+/// require exclusive access. `name` must be readable through its NUL terminator or for the full
+/// eight-byte source field.
 #[no_mangle]
 pub unsafe extern "C" fn peios_token_builder_source(
     b: *mut peios_token_builder,
@@ -565,6 +626,10 @@ pub unsafe extern "C" fn peios_token_builder_source(
 }
 
 /// `peios_token_builder_audit_policy` — set the audit-policy bits.
+///
+/// # Safety
+/// `b` must be NULL or a live builder returned by `peios_token_builder_new`; mutable calls
+/// require exclusive access.
 #[no_mangle]
 pub unsafe extern "C" fn peios_token_builder_audit_policy(b: *mut peios_token_builder, bits: u32) {
     if let Some(b) = b.as_mut() {
@@ -575,6 +640,10 @@ pub unsafe extern "C" fn peios_token_builder_audit_policy(b: *mut peios_token_bu
 }
 
 /// `peios_token_builder_add_restricted_sid` — append a restricting SID.
+///
+/// # Safety
+/// `b` must be NULL or a live builder returned by `peios_token_builder_new`; mutable calls
+/// require exclusive access. A non-null `sid` must be readable for `len` bytes.
 #[no_mangle]
 pub unsafe extern "C" fn peios_token_builder_add_restricted_sid(
     b: *mut peios_token_builder,
@@ -593,6 +662,10 @@ pub unsafe extern "C" fn peios_token_builder_add_restricted_sid(
 }
 
 /// `peios_token_builder_add_device_group` — append a device group.
+///
+/// # Safety
+/// `b` must be NULL or a live builder returned by `peios_token_builder_new`; mutable calls
+/// require exclusive access. A non-null `sid` must be readable for `len` bytes.
 #[no_mangle]
 pub unsafe extern "C" fn peios_token_builder_add_device_group(
     b: *mut peios_token_builder,
@@ -611,6 +684,10 @@ pub unsafe extern "C" fn peios_token_builder_add_device_group(
 }
 
 /// `peios_token_builder_confinement` — set the confinement SID.
+///
+/// # Safety
+/// `b` must be NULL or a live builder returned by `peios_token_builder_new`; mutable calls
+/// require exclusive access. A non-null `sid` must be readable for `len` bytes.
 #[no_mangle]
 pub unsafe extern "C" fn peios_token_builder_confinement(
     b: *mut peios_token_builder,
@@ -632,6 +709,11 @@ pub unsafe extern "C" fn peios_token_builder_confinement(
 }
 
 /// `peios_token_builder_supp_gids` — set the projected supplementary GIDs.
+///
+/// # Safety
+/// `b` must be NULL or a live builder returned by `peios_token_builder_new`; mutable calls
+/// require exclusive access. `gids` must be NULL when `count` is zero, or point to `count`
+/// readable, aligned u32 values.
 #[no_mangle]
 pub unsafe extern "C" fn peios_token_builder_supp_gids(
     b: *mut peios_token_builder,
@@ -668,6 +750,10 @@ pub unsafe extern "C" fn peios_token_builder_supp_gids(
 }
 
 /// `peios_token_builder_flags` — set the four token-spec boolean flags.
+///
+/// # Safety
+/// `b` must be NULL or a live builder returned by `peios_token_builder_new`; mutable calls
+/// require exclusive access. A non-null `f` must point to a valid `peios_token_flags`.
 #[no_mangle]
 pub unsafe extern "C" fn peios_token_builder_flags(
     b: *mut peios_token_builder,
@@ -710,6 +796,27 @@ fn utf16le_cstr(s: &[u8]) -> Result<Vec<u8>, c_int> {
     out.try_reserve(2).map_err(|_| libc::ENOMEM)?;
     out.extend_from_slice(&[0, 0]); // UTF-16 NUL terminator
     Ok(out)
+}
+
+/// Encode the bytes referenced by a STRING, SID, or OCTET claim slot.
+fn encode_claim_data(data: &mut Vec<u8>, value_type: u32, bytes: &[u8]) -> Result<(), c_int> {
+    use peios_uapi::{KACS_CLAIM_TYPE_STRING, KACS_CLAIM_TYPE_SID};
+
+    let oom = |_| libc::ENOMEM;
+    if value_type == KACS_CLAIM_TYPE_STRING {
+        let encoded = utf16le_cstr(bytes)?;
+        try_extend(data, &encoded).map_err(oom)?;
+    } else if value_type == KACS_CLAIM_TYPE_SID {
+        if !sid_valid(bytes) {
+            return Err(libc::EINVAL);
+        }
+        try_extend(data, bytes).map_err(oom)?;
+    } else {
+        // OCTET: [len:u32][bytes].
+        try_extend(data, &u32_len(bytes.len())?.to_le_bytes()).map_err(oom)?;
+        try_extend(data, bytes).map_err(oom)?;
+    }
+    Ok(())
 }
 
 /// Encode one claim into a claim-attribute entry payload (the bytes a
@@ -796,19 +903,7 @@ unsafe fn encode_claim(claim: &peios_token_claim) -> Result<Vec<u8>, c_int> {
             slice::from_raw_parts(v.bytes as *const u8, v.len)
         };
         try_extend(&mut slots, &u32_len(data0 + data.len())?.to_le_bytes()).map_err(oom)?;
-        if vt == KACS_CLAIM_TYPE_STRING {
-            let encoded = utf16le_cstr(b)?;
-            try_extend(&mut data, &encoded).map_err(oom)?;
-        } else if vt == KACS_CLAIM_TYPE_SID {
-            if !sid_valid(b) {
-                return Err(libc::EINVAL);
-            }
-            try_extend(&mut data, b).map_err(oom)?;
-        } else {
-            // OCTET: [len:u32][bytes].
-            try_extend(&mut data, &u32_len(b.len())?.to_le_bytes()).map_err(oom)?;
-            try_extend(&mut data, b).map_err(oom)?;
-        }
+        encode_claim_data(&mut data, vt, b)?;
     }
 
     let name_off = u32_len(data0 + data.len())?;
@@ -832,8 +927,17 @@ unsafe fn encode_claim(claim: &peios_token_claim) -> Result<Vec<u8>, c_int> {
     Ok(s)
 }
 
+enum ClaimSection {
+    User,
+    Device,
+}
+
 /// Append a claim to a section as `[entry_len:u32][payload]`, latching on error.
-unsafe fn add_claim(b: &mut peios_token_builder, device: bool, claim: *const peios_token_claim) {
+unsafe fn add_claim(
+    b: &mut peios_token_builder,
+    target: ClaimSection,
+    claim: *const peios_token_claim,
+) {
     if b.error != 0 {
         return;
     }
@@ -855,10 +959,9 @@ unsafe fn add_claim(b: &mut peios_token_builder, device: bool, claim: *const pei
             return;
         }
     };
-    let section = if device {
-        &mut b.device_claims
-    } else {
-        &mut b.user_claims
+    let section = match target {
+        ClaimSection::User => &mut b.user_claims,
+        ClaimSection::Device => &mut b.device_claims,
     };
     if try_extend(section, &entry_len.to_le_bytes()).is_err()
         || try_extend(section, &payload).is_err()
@@ -868,25 +971,67 @@ unsafe fn add_claim(b: &mut peios_token_builder, device: bool, claim: *const pei
 }
 
 /// `peios_token_builder_add_user_claim` — append a user claim.
+///
+/// # Safety
+/// `b` must be NULL or a live builder returned by `peios_token_builder_new`; mutable calls
+/// require exclusive access. A non-null `claim` and its value array must be readable; its name
+/// and any string values must satisfy the documented encoding and length contracts.
 #[no_mangle]
 pub unsafe extern "C" fn peios_token_builder_add_user_claim(
     b: *mut peios_token_builder,
     claim: *const peios_token_claim,
 ) {
     if let Some(b) = b.as_mut() {
-        add_claim(b, false, claim);
+        add_claim(b, ClaimSection::User, claim);
     }
 }
 
 /// `peios_token_builder_add_device_claim` — append a device claim.
+///
+/// # Safety
+/// `b` must be NULL or a live builder returned by `peios_token_builder_new`; mutable calls
+/// require exclusive access. A non-null `claim` and its value array must be readable; its name
+/// and any string values must satisfy the documented encoding and length contracts.
 #[no_mangle]
 pub unsafe extern "C" fn peios_token_builder_add_device_claim(
     b: *mut peios_token_builder,
     claim: *const peios_token_claim,
 ) {
     if let Some(b) = b.as_mut() {
-        add_claim(b, true, claim);
+        add_claim(b, ClaimSection::Device, claim);
     }
+}
+
+/// Decode the private-layer names before encoding the credentials block.
+///
+/// # Safety
+/// Every non-null pointer is readable through its NUL or for the kernel's
+/// maximum layer-name length plus one byte, and stays live for the result.
+unsafe fn credential_layer_names<'a>(layer_ptrs: &[*const c_char]) -> Result<Vec<&'a [u8]>, c_int> {
+    use peios_uapi::KACS_TOKEN_LCS_MAX_LAYER_NAME_BYTES;
+
+    let max_name = KACS_TOKEN_LCS_MAX_LAYER_NAME_BYTES as usize;
+    let mut names: Vec<&[u8]> = Vec::new();
+    names
+        .try_reserve(layer_ptrs.len())
+        .map_err(|_| libc::ENOMEM)?;
+    for &p in layer_ptrs {
+        if p.is_null() {
+            return Err(libc::EINVAL);
+        }
+        let name = cstr_bytes(p, max_name + 1).ok_or(libc::EINVAL)?;
+        if name.is_empty()
+            || name.len() > max_name
+            || core::str::from_utf8(name).is_err()
+            || name.iter().any(|&c| c == b'/' || c == b'\\')
+            || names.iter().any(|m| m.eq_ignore_ascii_case(name))
+        {
+            return Err(libc::EINVAL);
+        }
+        names.push(name);
+    }
+
+    Ok(names)
 }
 
 /// Encode the LCS registry-credentials extension and validate it against the
@@ -900,8 +1045,8 @@ pub unsafe extern "C" fn peios_token_builder_add_device_claim(
 /// `creds` arrays must be valid for their stated counts.
 unsafe fn encode_lcs(creds: &peios_token_lcs_credentials) -> Result<Vec<u8>, c_int> {
     use peios_uapi::{
-        KACS_TOKEN_LCS_EXT_VERSION, KACS_TOKEN_LCS_MAX_LAYER_NAME_BYTES,
-        KACS_TOKEN_LCS_MAX_PRIVATE_LAYERS, KACS_TOKEN_LCS_MAX_SCOPE_GUIDS,
+        KACS_TOKEN_LCS_EXT_VERSION, KACS_TOKEN_LCS_MAX_PRIVATE_LAYERS,
+        KACS_TOKEN_LCS_MAX_SCOPE_GUIDS,
     };
     let oom = |_| libc::ENOMEM;
     let scope_count = creds.scope_count as usize;
@@ -934,24 +1079,7 @@ unsafe fn encode_lcs(creds: &peios_token_lcs_credentials) -> Result<Vec<u8>, c_i
     } else {
         &[]
     };
-    let max_name = KACS_TOKEN_LCS_MAX_LAYER_NAME_BYTES as usize;
-    let mut names: Vec<&[u8]> = Vec::new();
-    names.try_reserve(layer_count).map_err(|_| libc::ENOMEM)?;
-    for &p in layer_ptrs {
-        if p.is_null() {
-            return Err(libc::EINVAL);
-        }
-        let name = cstr_bytes(p, max_name + 1).ok_or(libc::EINVAL)?;
-        if name.is_empty()
-            || name.len() > max_name
-            || core::str::from_utf8(name).is_err()
-            || name.iter().any(|&c| c == b'/' || c == b'\\')
-            || names.iter().any(|m| m.eq_ignore_ascii_case(name))
-        {
-            return Err(libc::EINVAL);
-        }
-        names.push(name);
-    }
+    let names = credential_layer_names(layer_ptrs)?;
 
     let mut ext: Vec<u8> = Vec::new();
     try_extend(&mut ext, &KACS_TOKEN_LCS_EXT_VERSION.to_le_bytes()).map_err(oom)?;
@@ -972,6 +1100,11 @@ unsafe fn encode_lcs(creds: &peios_token_lcs_credentials) -> Result<Vec<u8>, c_i
 
 /// `peios_token_builder_lcs_credentials` — set the LCS registry-credentials
 /// extension (replaces any prior).
+///
+/// # Safety
+/// `b` must be NULL or a live builder returned by `peios_token_builder_new`; mutable calls
+/// require exclusive access. A non-null `creds` and its arrays must be readable for their counts;
+/// each layer name must be readable through its NUL terminator or the bounded scan length.
 #[no_mangle]
 pub unsafe extern "C" fn peios_token_builder_lcs_credentials(
     b: *mut peios_token_builder,
@@ -998,6 +1131,11 @@ pub unsafe extern "C" fn peios_token_builder_lcs_credentials(
 /// `peios_token_builder_bytes` — serialize and borrow the spec; returns the
 /// length (or -1 + errno) and sets `*out` to a pointer valid until the next
 /// mutating call.
+///
+/// # Safety
+/// `b` must be NULL or a live builder returned by `peios_token_builder_new`; mutable calls
+/// require exclusive access. A non-null `out` must be writable for one pointer; the borrowed
+/// output remains valid only until the next mutation or free.
 #[no_mangle]
 pub unsafe extern "C" fn peios_token_builder_bytes(
     b: *mut peios_token_builder,
@@ -1030,6 +1168,10 @@ pub unsafe extern "C" fn peios_token_builder_bytes(
 /// `peios_token_builder_create` — serialize and mint the token in one step,
 /// returning the new token fd (or `-1` + errno). Forwards the materialized spec
 /// to `kacs_create_token`; the sticky error is surfaced before any syscall.
+///
+/// # Safety
+/// `b` must be NULL or a live builder returned by `peios_token_builder_new`; mutable calls
+/// require exclusive access.
 #[no_mangle]
 pub unsafe extern "C" fn peios_token_builder_create(b: *mut peios_token_builder) -> libc::c_int {
     let Some(b) = b.as_mut() else {
@@ -1049,6 +1191,10 @@ pub unsafe extern "C" fn peios_token_builder_create(b: *mut peios_token_builder)
 }
 
 /// `peios_token_builder_error` — the latched errno, or 0 if healthy.
+///
+/// # Safety
+/// `b` must be NULL or a live builder returned by `peios_token_builder_new`; mutable calls
+/// require exclusive access.
 #[no_mangle]
 pub unsafe extern "C" fn peios_token_builder_error(b: *const peios_token_builder) -> libc::c_int {
     match b.as_ref() {

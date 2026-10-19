@@ -27,10 +27,10 @@
 
 #include <stddef.h>
 #include <stdint.h>
-#include <sys/types.h>		/* ssize_t */
+#include <sys/types.h> /* ssize_t */
 
 #include <pkm/lcs.h>
-#include <rsi/request.h>	/* struct rsi_request */
+#include <rsi/request.h> /* struct rsi_request */
 
 #ifdef __cplusplus
 extern "C" {
@@ -57,21 +57,21 @@ int rsi_respond_status(int fd, const struct rsi_request *req, uint32_t status);
 
 /* One resolved path entry: a layer's view of a child (LOOKUP, ENUM_CHILDREN). */
 struct rsi_path_entry {
-	const void     *layer;
-	uint32_t	layer_len;
-	uint8_t		target_type;	/* RSI_PATH_TARGET_GUID (0) / RSI_PATH_TARGET_HIDDEN (1) */
-	uint8_t		target_guid[16];
-	uint64_t	sequence;
+    const void *layer;
+    uint32_t layer_len;
+    uint8_t target_type; /* RSI_PATH_TARGET_GUID (0) / RSI_PATH_TARGET_HIDDEN (1) */
+    uint8_t target_guid[16];
+    uint64_t sequence;
 };
 
 /* One key's non-layered metadata, returned alongside LOOKUP / ENUM_CHILDREN. */
 struct rsi_key_metadata {
-	uint8_t		guid[16];
-	const void     *sd;
-	uint32_t	sd_len;
-	uint8_t		volatile_key;
-	uint8_t		symlink;
-	uint64_t	last_write_time;
+    uint8_t guid[16];
+    const void *sd;
+    uint32_t sd_len;
+    uint8_t volatile_key;
+    uint8_t symlink;
+    uint64_t last_write_time;
 };
 
 /*
@@ -80,9 +80,9 @@ struct rsi_key_metadata {
  * is not a LOOKUP request, a nonzero count has a NULL array, or an entry has invalid
  * target/boolean fields, missing/duplicate metadata, or unreferenced metadata).
  */
-int rsi_respond_lookup(int fd, const struct rsi_request *req,
-		       const struct rsi_path_entry *entries, uint32_t entry_count,
-		       const struct rsi_key_metadata *metadata, uint32_t metadata_count);
+int rsi_respond_lookup(int fd, const struct rsi_request *req, const struct rsi_path_entry *entries,
+                       uint32_t entry_count, const struct rsi_key_metadata *metadata,
+                       uint32_t metadata_count);
 
 /*
  * rsi_respond_delete_layer - DELETE_LAYER success: @orphaned_guids is a flat
@@ -90,15 +90,15 @@ int rsi_respond_lookup(int fd, const struct rsi_request *req,
  * 0, or -1 with errno (EINVAL if @req is not a DELETE_LAYER request or a nonzero
  * count has a NULL array, nil GUID, or duplicate GUID).
  */
-int rsi_respond_delete_layer(int fd, const struct rsi_request *req,
-			     const uint8_t *orphaned_guids, uint32_t orphaned_count);
+int rsi_respond_delete_layer(int fd, const struct rsi_request *req, const uint8_t *orphaned_guids,
+                             uint32_t orphaned_count);
 
 /* One enumerated child: its name and the path entries that resolve it. */
 struct rsi_child_entry {
-	const void	       *child_name;
-	uint32_t		child_name_len;
-	const struct rsi_path_entry *entries;
-	uint32_t		entry_count;
+    const void *child_name;
+    uint32_t child_name_len;
+    const struct rsi_path_entry *entries;
+    uint32_t entry_count;
 };
 
 /*
@@ -109,36 +109,35 @@ struct rsi_child_entry {
  * metadata).
  */
 int rsi_respond_enum_children(int fd, const struct rsi_request *req,
-			      const struct rsi_child_entry *children, uint32_t child_count,
-			      const struct rsi_key_metadata *metadata, uint32_t metadata_count);
+                              const struct rsi_child_entry *children, uint32_t child_count,
+                              const struct rsi_key_metadata *metadata, uint32_t metadata_count);
 
 /*
  * rsi_respond_read_key - READ_KEY success: the key's non-layered metadata. Returns 0,
  * or -1 with errno (EINVAL if @req is not a READ_KEY request, @parent_guid is NULL,
  * or a boolean field is invalid).
  */
-int rsi_respond_read_key(int fd, const struct rsi_request *req, const void *name,
-			 uint32_t name_len, const uint8_t *parent_guid, const void *sd,
-			 uint32_t sd_len, uint8_t volatile_key, uint8_t symlink,
-			 uint64_t last_write_time);
+int rsi_respond_read_key(int fd, const struct rsi_request *req, const void *name, uint32_t name_len,
+                         const uint8_t *parent_guid, const void *sd, uint32_t sd_len,
+                         uint8_t volatile_key, uint8_t symlink, uint64_t last_write_time);
 
 /* One effective value entry (QUERY_VALUES). */
 struct rsi_value_entry {
-	const void     *value_name;
-	uint32_t	value_name_len;
-	const void     *layer_name;
-	uint32_t	layer_name_len;
-	uint32_t	value_type;
-	const void     *data;
-	uint32_t	data_len;
-	uint64_t	sequence;
+    const void *value_name;
+    uint32_t value_name_len;
+    const void *layer_name;
+    uint32_t layer_name_len;
+    uint32_t value_type;
+    const void *data;
+    uint32_t data_len;
+    uint64_t sequence;
 };
 
 /* One blanket-tombstone entry (QUERY_VALUES). */
 struct rsi_blanket_entry {
-	const void     *layer_name;
-	uint32_t	layer_name_len;
-	uint64_t	sequence;
+    const void *layer_name;
+    uint32_t layer_name_len;
+    uint64_t sequence;
 };
 
 /*
@@ -147,8 +146,8 @@ struct rsi_blanket_entry {
  * QUERY_VALUES request or a nonzero count has a NULL array).
  */
 int rsi_respond_query_values(int fd, const struct rsi_request *req,
-			     const struct rsi_value_entry *entries, uint32_t entry_count,
-			     const struct rsi_blanket_entry *blankets, uint32_t blanket_count);
+                             const struct rsi_value_entry *entries, uint32_t entry_count,
+                             const struct rsi_blanket_entry *blankets, uint32_t blanket_count);
 
 #ifdef __cplusplus
 }

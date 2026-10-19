@@ -23,9 +23,9 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <stdbool.h>
-#include <sys/types.h>		/* ssize_t */
+#include <sys/types.h> /* ssize_t */
 
-#include <pkm/token.h>		/* pulls in <pkm/sd.h> */
+#include <pkm/token.h> /* pulls in <pkm/sd.h> */
 
 #ifdef __cplusplus
 extern "C" {
@@ -97,14 +97,14 @@ int peios_socket_restamp(int sock_fd);
  * inputs (a caller-owned array; NULL with fd_cap 0 to accept none);
  * @token_fd, @fd_count and @flags are outputs. */
 struct peios_socket_message {
-	int	 token_fd;	/* out: attached token (QUERY|IMPERSONATE|DUPLICATE, O_CLOEXEC), or -1 */
-	int	*fds;		/* in: SCM_RIGHTS descriptors land here, each O_CLOEXEC */
-	unsigned fd_cap;	/* in: capacity of @fds */
-	unsigned fd_count;	/* out: how many were filled */
-	unsigned flags;		/* out: PEIOS_SOCKET_MSG_* */
+    int token_fd;      /* out: attached token (QUERY|IMPERSONATE|DUPLICATE, O_CLOEXEC), or -1 */
+    int *fds;          /* in: SCM_RIGHTS descriptors land here, each O_CLOEXEC */
+    unsigned fd_cap;   /* in: capacity of @fds */
+    unsigned fd_count; /* out: how many were filled */
+    unsigned flags;    /* out: PEIOS_SOCKET_MSG_* */
 };
-#define PEIOS_SOCKET_MSG_TRUNCATED	0x1u	/* data did not fit (MSG_TRUNC) */
-#define PEIOS_SOCKET_MSG_CTRUNCATED	0x2u	/* ancillary data did not fit (MSG_CTRUNC) */
+#define PEIOS_SOCKET_MSG_TRUNCATED 0x1u  /* data did not fit (MSG_TRUNC) */
+#define PEIOS_SOCKET_MSG_CTRUNCATED 0x2u /* ancillary data did not fit (MSG_CTRUNC) */
 
 /* Send @len bytes from @buf on @sock_fd, attaching @token_fd as a
  * KACS_SCM_TOKEN when it is >= 0 and @fds[0..@fd_count] as SCM_RIGHTS when
@@ -112,9 +112,8 @@ struct peios_socket_message {
  * attach exactly as it gates impersonating it (EACCES without
  * TOKEN_IMPERSONATE; EPERM if attaching would lower the token's level). The
  * caller keeps its descriptors. Returns the bytes sent, or -1 with errno. */
-ssize_t peios_socket_send_message(int sock_fd, const void *buf, size_t len,
-				  int token_fd, const int *fds, unsigned fd_count,
-				  int flags);
+ssize_t peios_socket_send_message(int sock_fd, const void *buf, size_t len, int token_fd,
+                                  const int *fds, unsigned fd_count, int flags);
 
 /* Receive one message into @buf/@cap with room for one attached token and
  * @msg->fd_cap descriptors; MSG_CMSG_CLOEXEC is always added to @flags.
@@ -123,7 +122,7 @@ ssize_t peios_socket_send_message(int sock_fd, const void *buf, size_t len,
  * nothing was consumed and *@msg is untouched. Returns the bytes received
  * (0 at end of stream), or -1 with errno. */
 ssize_t peios_socket_recv_message(int sock_fd, void *buf, size_t cap,
-				  struct peios_socket_message *msg, int flags);
+                                  struct peios_socket_message *msg, int flags);
 
 /* A pidfd (O_CLOEXEC) for the process on the other end of a connected Unix
  * socket — getsockopt(SOL_SOCKET, SO_PEERPIDFD). The kernel's handle on the
@@ -140,17 +139,16 @@ int peios_token_create_raw(const void *spec, size_t len);
 typedef struct peios_token_builder peios_token_builder;
 
 peios_token_builder *peios_token_builder_new(void);
-void		     peios_token_builder_free(peios_token_builder *b);
-void		     peios_token_builder_reset(peios_token_builder *b);
+void peios_token_builder_free(peios_token_builder *b);
+void peios_token_builder_reset(peios_token_builder *b);
 
 /* Core fields. Owner / primary-group / restrict indices follow the wire
  * convention: index 0 = the user SID, 1..N = the Nth added group. Do not add
  * the logon SID yourself — the kernel injects it. */
 void peios_token_builder_user(peios_token_builder *b, const void *sid, size_t len);
-void peios_token_builder_add_group(peios_token_builder *b, const void *sid,
-				   size_t len, uint32_t attrs);
-void peios_token_builder_privileges(peios_token_builder *b, uint64_t present,
-				    uint64_t enabled);
+void peios_token_builder_add_group(peios_token_builder *b, const void *sid, size_t len,
+                                   uint32_t attrs);
+void peios_token_builder_privileges(peios_token_builder *b, uint64_t present, uint64_t enabled);
 /* Choose the level deliberately: it bounds all identities derived from this
  * token, including a primary. CreateToken accepts all four levels; a low
  * primary ceiling limits peers without changing the process's own identity.
@@ -166,24 +164,22 @@ void peios_token_builder_default_dacl(peios_token_builder *b, const void *acl, s
 void peios_token_builder_mandatory_policy(peios_token_builder *b, uint32_t bits);
 void peios_token_builder_projected_ids(peios_token_builder *b, uint32_t uid, uint32_t gid);
 void peios_token_builder_expiration(peios_token_builder *b, uint64_t when);
-void peios_token_builder_source(peios_token_builder *b, const char name[8],
-				uint64_t source_id);
+void peios_token_builder_source(peios_token_builder *b, const char name[8], uint64_t source_id);
 void peios_token_builder_audit_policy(peios_token_builder *b, uint32_t bits);
-void peios_token_builder_add_restricted_sid(peios_token_builder *b, const void *sid,
-					    size_t len, uint32_t attrs);
-void peios_token_builder_add_device_group(peios_token_builder *b, const void *sid,
-					  size_t len, uint32_t attrs);
+void peios_token_builder_add_restricted_sid(peios_token_builder *b, const void *sid, size_t len,
+                                            uint32_t attrs);
+void peios_token_builder_add_device_group(peios_token_builder *b, const void *sid, size_t len,
+                                          uint32_t attrs);
 void peios_token_builder_confinement(peios_token_builder *b, const void *sid, size_t len);
 /* Replace projected supplementary GIDs; pass NULL, 0 to clear. */
-void peios_token_builder_supp_gids(peios_token_builder *b, const uint32_t *gids,
-				   unsigned count);
+void peios_token_builder_supp_gids(peios_token_builder *b, const uint32_t *gids, unsigned count);
 
 /* The four token-spec boolean flags, set together via designated initializers. */
 struct peios_token_flags {
-	bool	write_restricted;
-	bool	user_deny_only;
-	bool	isolation_boundary;
-	bool	confinement_exempt;
+    bool write_restricted;
+    bool user_deny_only;
+    bool isolation_boundary;
+    bool confinement_exempt;
 };
 void peios_token_builder_flags(peios_token_builder *b, const struct peios_token_flags *f);
 
@@ -198,26 +194,26 @@ void peios_token_builder_flags(peios_token_builder *b, const struct peios_token_
  *   KACS_CLAIM_TYPE_OCTET  -> bytes/len, an opaque blob
  */
 struct peios_token_claim_value {
-	uint64_t	scalar;
-	const void     *bytes;
-	size_t		len;
+    uint64_t scalar;
+    const void *bytes;
+    size_t len;
 };
 
 /* A claim attribute: a named, typed, multi-valued security attribute. */
 struct peios_token_claim {
-	const char     *name;		/* UTF-8; transcoded to UTF-16LE on the wire */
-	uint16_t	value_type;	/* KACS_CLAIM_TYPE_* */
-	uint32_t	flags;		/* KACS_CLAIM_ATTR_* */
-	const struct peios_token_claim_value *values;
-	unsigned	value_count;
+    const char *name;    /* UTF-8; transcoded to UTF-16LE on the wire */
+    uint16_t value_type; /* KACS_CLAIM_TYPE_* */
+    uint32_t flags;      /* KACS_CLAIM_ATTR_* */
+    const struct peios_token_claim_value *values;
+    unsigned value_count;
 };
 
 /* Append a user / device claim. Each is round-tripped through the kernel's own
  * claim parser before acceptance, so a malformed claim latches EINVAL here. */
 void peios_token_builder_add_user_claim(peios_token_builder *b,
-					const struct peios_token_claim *claim);
+                                        const struct peios_token_claim *claim);
 void peios_token_builder_add_device_claim(peios_token_builder *b,
-					  const struct peios_token_claim *claim);
+                                          const struct peios_token_claim *claim);
 
 /*
  * The LCS registry-credentials extension: the layer scope GUIDs the token may
@@ -225,20 +221,20 @@ void peios_token_builder_add_device_claim(peios_token_builder *b,
  * it is emitted as the final token-spec section.
  */
 struct peios_token_lcs_credentials {
-	const uint8_t (*scope_guids)[16];	/* array of 16-byte GUIDs, each non-nil & unique */
-	unsigned	scope_count;		/* <= KACS_TOKEN_LCS_MAX_SCOPE_GUIDS */
-	const char *const *private_layers;	/* UTF-8 names, 1..255 bytes, no '/' or '\\', unique */
-	unsigned	private_layer_count;	/* <= KACS_TOKEN_LCS_MAX_PRIVATE_LAYERS */
+    const uint8_t (*scope_guids)[16];  /* array of 16-byte GUIDs, each non-nil & unique */
+    unsigned scope_count;              /* <= KACS_TOKEN_LCS_MAX_SCOPE_GUIDS */
+    const char *const *private_layers; /* UTF-8 names, 1..255 bytes, no '/' or '\\', unique */
+    unsigned private_layer_count;      /* <= KACS_TOKEN_LCS_MAX_PRIVATE_LAYERS */
 };
 void peios_token_builder_lcs_credentials(peios_token_builder *b,
-					 const struct peios_token_lcs_credentials *creds);
+                                         const struct peios_token_lcs_credentials *creds);
 
 /* Serialize, or create the token in one step. _bytes() returns the serialized
  * length and, if @out is non-NULL, a pointer into the builder (valid until
  * reset/free); _create() returns the new token fd. */
 ssize_t peios_token_builder_bytes(peios_token_builder *b, const void **out);
-int	peios_token_builder_create(peios_token_builder *b);
-int	peios_token_builder_error(const peios_token_builder *b);
+int peios_token_builder_create(peios_token_builder *b);
+int peios_token_builder_error(const peios_token_builder *b);
 
 /* ====================================================================== */
 /* Query (token information classes)                                      */
@@ -250,38 +246,40 @@ ssize_t peios_token_query(int fd, uint32_t info_class, void *buf, size_t cap);
 
 /* The four privilege words of KACS_TOKEN_CLASS_PRIVILEGES. */
 struct peios_privilege_set {
-	uint64_t present;
-	uint64_t enabled;
-	uint64_t enabled_by_default;
-	uint64_t used;
+    uint64_t present;
+    uint64_t enabled;
+    uint64_t enabled_by_default;
+    uint64_t used;
 };
 
 /* Fixed result of KACS_TOKEN_CLASS_STATISTICS. auth_id is the token's u64
  * LogonSession LUID; it is distinct from the u32 interactivity scope. */
 struct peios_token_statistics {
-	uint64_t token_id;
-	uint64_t auth_id;
-	uint64_t modified_id;
-	uint32_t token_type;
-	uint32_t reserved;
-	uint64_t expiration;
+    uint64_t token_id;
+    uint64_t auth_id;
+    uint64_t modified_id;
+    uint32_t token_type;
+    uint32_t reserved;
+    uint64_t expiration;
 };
 
 /* User SID, getxattr-style like peios_token_query(): pass sid_buf == NULL with
  * cap == 0 to probe for the required size. */
-ssize_t peios_token_user(int fd, void *sid_buf, size_t cap);		/* CLASS_USER */
+ssize_t peios_token_user(int fd, void *sid_buf, size_t cap); /* CLASS_USER */
 
 /* Typed convenience over peios_token_query() for the common scalar classes.
  * Output pointers are mandatory and must be non-NULL. */
-int	peios_token_type(int fd, uint32_t *out);			/* CLASS_TYPE */
-int	peios_token_impersonation_level(int fd, uint32_t *out);	/* CLASS_IMPERSONATION_LEVEL: the ceiling on every token, primary included */
-int	peios_token_interactivity_scope(int fd, uint32_t *out);	/* CLASS_INTERACTIVITY_SCOPE */
-int	peios_token_statistics(int fd, struct peios_token_statistics *out);	/* CLASS_STATISTICS */
+int peios_token_type(int fd, uint32_t *out); /* CLASS_TYPE */
+int peios_token_impersonation_level(
+    int fd,
+    uint32_t *out); /* CLASS_IMPERSONATION_LEVEL: the ceiling on every token, primary included */
+int peios_token_interactivity_scope(int fd, uint32_t *out); /* CLASS_INTERACTIVITY_SCOPE */
+int peios_token_statistics(int fd, struct peios_token_statistics *out); /* CLASS_STATISTICS */
 /* Immutable token GUID, in the same raw byte order as KMES event headers.
  * Requires TOKEN_QUERY. guid_out must point to 16 writable bytes. */
-int	peios_token_guid(int fd, uint8_t guid_out[16]);		/* CLASS_GUID */
-int	peios_token_integrity(int fd, uint32_t *level_rid_out);		/* CLASS_INTEGRITY_LEVEL */
-int	peios_token_privileges(int fd, struct peios_privilege_set *out);	/* CLASS_PRIVILEGES */
+int peios_token_guid(int fd, uint8_t guid_out[16]);                  /* CLASS_GUID */
+int peios_token_integrity(int fd, uint32_t *level_rid_out);          /* CLASS_INTEGRITY_LEVEL */
+int peios_token_privileges(int fd, struct peios_privilege_set *out); /* CLASS_PRIVILEGES */
 
 /* ====================================================================== */
 /* Adjust / transform                                                     */
@@ -289,14 +287,14 @@ int	peios_token_privileges(int fd, struct peios_privilege_set *out);	/* CLASS_PR
 
 /* Adjust privileges; @prev_enabled (if non-NULL) receives the prior enabled
  * mask. peios_token_reset_privileges() restores enabled := enabled-by-default. */
-int peios_token_adjust_privileges(int fd, const struct kacs_priv_entry *entries,
-				  unsigned count, uint64_t *prev_enabled);
+int peios_token_adjust_privileges(int fd, const struct kacs_priv_entry *entries, unsigned count,
+                                  uint64_t *prev_enabled);
 int peios_token_reset_privileges(int fd);
 
 /* Adjust groups [adv]; @prev_state (if non-NULL) points at a caller array of
  * KACS_TOKEN_GROUP_MASK_WORDS u64 words receiving the prior enabled bitmask. */
-int peios_token_adjust_groups(int fd, const struct kacs_group_entry *entries,
-			      unsigned count, uint64_t *prev_state);
+int peios_token_adjust_groups(int fd, const struct kacs_group_entry *entries, unsigned count,
+                              uint64_t *prev_state);
 int peios_token_reset_groups(int fd);
 
 /* Duplicate this token; returns a new fd. @type is KACS_TOKEN_TYPE_*, @imp_level
@@ -307,13 +305,13 @@ int peios_token_duplicate(int fd, uint32_t access, uint8_t type, uint8_t imp_lev
 
 /* Create a restricted (filtered) token; returns a new fd [adv]. */
 struct peios_token_restrict {
-	uint64_t	   privs_to_delete;
-	const uint32_t	  *deny_group_indices;	/* groups demoted to deny-only */
-	unsigned	   deny_count;
-	const void *const *restrict_sids;	/* added restricting SIDs */
-	const size_t	  *restrict_sid_lens;
-	unsigned	   restrict_count;
-	uint32_t	   flags;		/* KACS_TOKEN_RESTRICT_WRITE_RESTRICTED */
+    uint64_t privs_to_delete;
+    const uint32_t *deny_group_indices; /* groups demoted to deny-only */
+    unsigned deny_count;
+    const void *const *restrict_sids; /* added restricting SIDs */
+    const size_t *restrict_sid_lens;
+    unsigned restrict_count;
+    uint32_t flags; /* KACS_TOKEN_RESTRICT_WRITE_RESTRICTED */
 };
 int peios_token_restrict(int fd, const struct peios_token_restrict *spec);
 
@@ -339,8 +337,8 @@ int peios_token_get_linked(int fd);
 /* Replace the token's default DACL and/or owner / primary-group indices [adv].
  * dacl == NULL leaves the DACL unchanged and ignores len; dacl != NULL with
  * len == 0 clears it; an index of 0xFFFF leaves that index unchanged. */
-int peios_token_adjust_default(int fd, const void *dacl, size_t len,
-			       uint16_t owner_index, uint16_t group_index);
+int peios_token_adjust_default(int fd, const void *dacl, size_t len, uint16_t owner_index,
+                               uint16_t group_index);
 
 /* Set the token's u32 interactive-environment scope [adv]
  * (SeTcbPrivilege). This does not change its LogonSession/auth_id. */
@@ -351,10 +349,10 @@ int peios_token_set_interactivity_scope(int fd, uint32_t scope);
 /* ====================================================================== */
 
 struct peios_session_spec {
-	uint8_t		logon_type;	/* KACS_LOGON_TYPE_* */
-	const char     *auth_package;	/* UTF-8; may be "" */
-	const void     *user_sid;
-	size_t		user_sid_len;
+    uint8_t logon_type;       /* KACS_LOGON_TYPE_* */
+    const char *auth_package; /* UTF-8; may be "" */
+    const void *user_sid;
+    size_t user_sid_len;
 };
 
 /* Create a logon session (SeTcbPrivilege); @id_out is mandatory and receives the id. */
@@ -369,14 +367,14 @@ int peios_session_destroy_empty(uint64_t session_id);
  * Administrators or SYSTEM.
  */
 struct peios_logon_session {
-	uint64_t	logon_session_id; /* the session's LUID: a token's auth_id */
-	uint64_t	created_at;	  /* seconds since the Unix epoch */
-	uint32_t	logon_type;	  /* KACS_LOGON_TYPE_* */
-	uint32_t	user_sid_len;
-	const uint8_t  *user_sid;	  /* binary SID */
-	const char     *auth_package;	  /* UTF-8, not NUL-terminated */
-	uint32_t	auth_package_len;
-	uint32_t	reserved;	  /* zero */
+    uint64_t logon_session_id; /* the session's LUID: a token's auth_id */
+    uint64_t created_at;       /* seconds since the Unix epoch */
+    uint32_t logon_type;       /* KACS_LOGON_TYPE_* */
+    uint32_t user_sid_len;
+    const uint8_t *user_sid;  /* binary SID */
+    const char *auth_package; /* UTF-8, not NUL-terminated */
+    uint32_t auth_package_len;
+    uint32_t reserved; /* zero */
 };
 
 typedef struct peios_logon_sessions peios_logon_sessions;

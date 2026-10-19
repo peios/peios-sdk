@@ -165,12 +165,22 @@ pub extern "C" fn peios_sd_builder_new() -> *mut peios_sd_builder {
 }
 
 /// `peios_sd_builder_free` — destroy a builder (NULL-safe).
+///
+/// # Safety
+/// `b` must be NULL or an exclusively owned live builder from the matching
+/// constructor. A non-NULL builder is consumed and must not be used again.
 #[no_mangle]
 pub unsafe extern "C" fn peios_sd_builder_free(b: *mut peios_sd_builder) {
     raw_free(b);
 }
 
 /// `peios_sd_builder_reset` — clear all components and the sticky error.
+///
+/// # Safety
+/// Any non-NULL builder must be live, and calls that mutate it require exclusive
+/// access. Input buffers must remain readable for their stated lengths; non-NULL
+/// output pointers must be aligned and writable for their declared capacities.
+/// Borrowed builder bytes must not be used across mutations or destruction.
 #[no_mangle]
 pub unsafe extern "C" fn peios_sd_builder_reset(b: *mut peios_sd_builder) {
     if let Some(b) = b.as_mut() {
@@ -182,11 +192,20 @@ pub unsafe extern "C" fn peios_sd_builder_reset(b: *mut peios_sd_builder) {
 // Components
 // ----------------------------------------------------------------------------
 
+///
+/// # Safety
+/// A non-NULL `ptr` must remain readable for `len` bytes for the borrowed lifetime.
 unsafe fn as_slice<'a>(ptr: *const c_void, len: usize) -> Option<&'a [u8]> {
     (!ptr.is_null()).then(|| slice::from_raw_parts(ptr as *const u8, len))
 }
 
 /// `peios_sd_builder_owner` — set the owner SID.
+///
+/// # Safety
+/// Any non-NULL builder must be live, and calls that mutate it require exclusive
+/// access. Input buffers must remain readable for their stated lengths; non-NULL
+/// output pointers must be aligned and writable for their declared capacities.
+/// Borrowed builder bytes must not be used across mutations or destruction.
 #[no_mangle]
 pub unsafe extern "C" fn peios_sd_builder_owner(
     b: *mut peios_sd_builder,
@@ -204,6 +223,12 @@ pub unsafe extern "C" fn peios_sd_builder_owner(
 }
 
 /// `peios_sd_builder_group` — set the primary-group SID.
+///
+/// # Safety
+/// Any non-NULL builder must be live, and calls that mutate it require exclusive
+/// access. Input buffers must remain readable for their stated lengths; non-NULL
+/// output pointers must be aligned and writable for their declared capacities.
+/// Borrowed builder bytes must not be used across mutations or destruction.
 #[no_mangle]
 pub unsafe extern "C" fn peios_sd_builder_group(
     b: *mut peios_sd_builder,
@@ -221,6 +246,12 @@ pub unsafe extern "C" fn peios_sd_builder_group(
 }
 
 /// `peios_sd_builder_control` — set/clear caller-controllable control bits.
+///
+/// # Safety
+/// Any non-NULL builder must be live, and calls that mutate it require exclusive
+/// access. Input buffers must remain readable for their stated lengths; non-NULL
+/// output pointers must be aligned and writable for their declared capacities.
+/// Borrowed builder bytes must not be used across mutations or destruction.
 #[no_mangle]
 pub unsafe extern "C" fn peios_sd_builder_control(b: *mut peios_sd_builder, set: u16, clear: u16) {
     let Some(b) = b.as_mut() else { return };
@@ -231,6 +262,12 @@ pub unsafe extern "C" fn peios_sd_builder_control(b: *mut peios_sd_builder, set:
 }
 
 /// `peios_sd_builder_dacl` — set a present DACL from ACL bytes.
+///
+/// # Safety
+/// Any non-NULL builder must be live, and calls that mutate it require exclusive
+/// access. Input buffers must remain readable for their stated lengths; non-NULL
+/// output pointers must be aligned and writable for their declared capacities.
+/// Borrowed builder bytes must not be used across mutations or destruction.
 #[no_mangle]
 pub unsafe extern "C" fn peios_sd_builder_dacl(
     b: *mut peios_sd_builder,
@@ -252,6 +289,12 @@ pub unsafe extern "C" fn peios_sd_builder_dacl(
 /// KACS has no NULL-DACL (`DACL_PRESENT` + null pointer) encoding, so this clears
 /// any previously set DACL: the built SD leaves `DACL_PRESENT` clear, which is
 /// KACS's grant-all form.
+///
+/// # Safety
+/// Any non-NULL builder must be live, and calls that mutate it require exclusive
+/// access. Input buffers must remain readable for their stated lengths; non-NULL
+/// output pointers must be aligned and writable for their declared capacities.
+/// Borrowed builder bytes must not be used across mutations or destruction.
 #[no_mangle]
 pub unsafe extern "C" fn peios_sd_builder_dacl_null(b: *mut peios_sd_builder) {
     let Some(b) = b.as_mut() else { return };
@@ -262,6 +305,12 @@ pub unsafe extern "C" fn peios_sd_builder_dacl_null(b: *mut peios_sd_builder) {
 }
 
 /// `peios_sd_builder_sacl` — set the SACL from ACL bytes.
+///
+/// # Safety
+/// Any non-NULL builder must be live, and calls that mutate it require exclusive
+/// access. Input buffers must remain readable for their stated lengths; non-NULL
+/// output pointers must be aligned and writable for their declared capacities.
+/// Borrowed builder bytes must not be used across mutations or destruction.
 #[no_mangle]
 pub unsafe extern "C" fn peios_sd_builder_sacl(
     b: *mut peios_sd_builder,
@@ -283,6 +332,12 @@ pub unsafe extern "C" fn peios_sd_builder_sacl(
 // ----------------------------------------------------------------------------
 
 /// `peios_sd_builder_bytes` — borrow the serialized SD (NULL if errored).
+///
+/// # Safety
+/// Any non-NULL builder must be live, and calls that mutate it require exclusive
+/// access. Input buffers must remain readable for their stated lengths; non-NULL
+/// output pointers must be aligned and writable for their declared capacities.
+/// Borrowed builder bytes must not be used across mutations or destruction.
 #[no_mangle]
 pub unsafe extern "C" fn peios_sd_builder_bytes(
     b: *mut peios_sd_builder,
@@ -311,6 +366,12 @@ pub unsafe extern "C" fn peios_sd_builder_bytes(
 }
 
 /// `peios_sd_builder_finish` — copy the serialized SD out, getxattr-style.
+///
+/// # Safety
+/// Any non-NULL builder must be live, and calls that mutate it require exclusive
+/// access. Input buffers must remain readable for their stated lengths; non-NULL
+/// output pointers must be aligned and writable for their declared capacities.
+/// Borrowed builder bytes must not be used across mutations or destruction.
 #[no_mangle]
 pub unsafe extern "C" fn peios_sd_builder_finish(
     b: *mut peios_sd_builder,
@@ -332,6 +393,12 @@ pub unsafe extern "C" fn peios_sd_builder_finish(
 }
 
 /// `peios_sd_builder_error` — the latched errno, or 0 if healthy.
+///
+/// # Safety
+/// Any non-NULL builder must be live, and calls that mutate it require exclusive
+/// access. Input buffers must remain readable for their stated lengths; non-NULL
+/// output pointers must be aligned and writable for their declared capacities.
+/// Borrowed builder bytes must not be used across mutations or destruction.
 #[no_mangle]
 pub unsafe extern "C" fn peios_sd_builder_error(b: *const peios_sd_builder) -> libc::c_int {
     match b.as_ref() {

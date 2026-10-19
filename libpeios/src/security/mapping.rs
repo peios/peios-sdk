@@ -20,6 +20,10 @@ const GENERIC_BITS: u32 = KACS_ACCESS_GENERIC_READ
 /// `peios_access_map_generic` — fold `mask`'s generic bits through `m`.
 ///
 /// A NULL `m` is a misuse; the mask is returned unchanged rather than faulting.
+///
+/// # Safety
+/// A non-NULL `m` must be aligned and point to an initialized mapping that
+/// remains readable for this call.
 #[no_mangle]
 pub unsafe extern "C" fn peios_access_map_generic(
     mask: u32,

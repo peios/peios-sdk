@@ -374,8 +374,8 @@ impl peios_event_policy {
         for _ in 0..2 {
             match open_key(-1, ROOT_PATH, KEY_READ) {
                 Ok(fd) => {
-                    self.root_watched = self.ensure_buf()
-                        && arm(fd.0, REG_NOTIFY_VALUE | REG_NOTIFY_SUBKEY, true);
+                    self.root_watched =
+                        self.ensure_buf() && arm(fd.0, REG_NOTIFY_VALUE | REG_NOTIFY_SUBKEY, true);
                     self.root = Some(fd);
                     self.ancestor = None;
                     break;
@@ -460,9 +460,7 @@ impl peios_event_policy {
 
     fn setting(&mut self, event_type: &[u8], segs: &[&[u8]]) -> Option<bool> {
         let root = self.root.as_ref()?.0;
-        let found = self
-            .cache
-            .binary_search_by(|(k, _)| (**k).cmp(event_type));
+        let found = self.cache.binary_search_by(|(k, _)| (**k).cmp(event_type));
         if let Ok(i) = found {
             return self.cache[i].1;
         }
@@ -608,8 +606,10 @@ mod tests {
             self
         }
         fn root_value(mut self, dword: u32) -> Self {
-            self.keys
-                .insert(String::new(), Some((REG_DWORD, dword.to_le_bytes().to_vec())));
+            self.keys.insert(
+                String::new(),
+                Some((REG_DWORD, dword.to_le_bytes().to_vec())),
+            );
             self
         }
     }
@@ -677,7 +677,9 @@ mod tests {
     /// The PGSS §6.9 example table.
     #[test]
     fn spec_example_table() {
-        let mut t = FakeTree::new().key("kacs", Some(0)).key("kacs\\audit", Some(1));
+        let mut t = FakeTree::new()
+            .key("kacs", Some(0))
+            .key("kacs\\audit", Some(1));
         assert!(on(&mut t, "lcs.config.value.rejected", S));
         assert!(!on(&mut t, "kacs.caap.staging.diverged", S));
         assert!(on(&mut t, "kacs.audit.handle.used", S));
@@ -746,7 +748,10 @@ mod tests {
             (REG_DWORD, u32::MAX.to_le_bytes().to_vec()),
             (peios_uapi::REG_SZ, b"1\0".to_vec()),
             (peios_uapi::REG_QWORD, 1u64.to_le_bytes().to_vec()),
-            (peios_uapi::REG_DWORD_BIG_ENDIAN, 1u32.to_be_bytes().to_vec()),
+            (
+                peios_uapi::REG_DWORD_BIG_ENDIAN,
+                1u32.to_be_bytes().to_vec(),
+            ),
             (REG_DWORD, vec![1, 0]),
             (peios_uapi::REG_BINARY, vec![1, 0, 0, 0]),
         ] {
@@ -778,11 +783,20 @@ mod tests {
 
     #[test]
     fn interpret_enabled_accepts_only_dword_zero_or_one() {
-        assert_eq!(interpret_enabled(REG_DWORD, &1u32.to_le_bytes()), Some(true));
-        assert_eq!(interpret_enabled(REG_DWORD, &0u32.to_le_bytes()), Some(false));
+        assert_eq!(
+            interpret_enabled(REG_DWORD, &1u32.to_le_bytes()),
+            Some(true)
+        );
+        assert_eq!(
+            interpret_enabled(REG_DWORD, &0u32.to_le_bytes()),
+            Some(false)
+        );
         assert_eq!(interpret_enabled(REG_DWORD, &2u32.to_le_bytes()), None);
         assert_eq!(interpret_enabled(REG_DWORD, &[1, 0, 0]), None);
-        assert_eq!(interpret_enabled(peios_uapi::REG_DWORD_BIG_ENDIAN, &[0, 0, 0, 1]), None);
+        assert_eq!(
+            interpret_enabled(peios_uapi::REG_DWORD_BIG_ENDIAN, &[0, 0, 0, 1]),
+            None
+        );
     }
 
     #[test]
@@ -858,8 +872,16 @@ mod tests {
 
     #[test]
     fn classify_value_and_subkey_records_as_changes() {
-        let mut buf = record(peios_uapi::REG_WATCH_VALUE_SET, b"Enabled", Some(&[b"kacs"]));
-        buf.extend(record(peios_uapi::REG_WATCH_SUBKEY_CREATED, b"audit", Some(&[])));
+        let mut buf = record(
+            peios_uapi::REG_WATCH_VALUE_SET,
+            b"Enabled",
+            Some(&[b"kacs"]),
+        );
+        buf.extend(record(
+            peios_uapi::REG_WATCH_SUBKEY_CREATED,
+            b"audit",
+            Some(&[]),
+        ));
         assert_eq!(
             classify_records(&buf),
             WatchNews {

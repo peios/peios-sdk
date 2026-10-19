@@ -3,8 +3,9 @@
 //! open and read, and is a few kilobytes at most, so it is read in one pass
 //! into a buffer and parsed from there.
 
-use alloc::vec::Vec;
 use core::ffi::{c_char, c_int};
+
+use alloc::vec::Vec;
 
 use peios_cabi::abi::try_extend;
 
@@ -36,7 +37,9 @@ pub(crate) unsafe fn read_whole(path: *const c_char) -> Result<Vec<u8>, c_int> {
             break Err(libc::ENOMEM);
         }
     };
-    libc::close(fd);
+    // No writes need flushing; report the read result and do not retry close,
+    // since Linux consumes the descriptor even when close reports an error.
+    let _ = libc::close(fd);
     result.map(|()| out)
 }
 
@@ -63,7 +66,7 @@ pub(crate) fn decimal(digits: &[u8]) -> Option<u64> {
 /// Lowercase or uppercase hexadecimal digits, two to a byte, appended to `out`.
 /// `None` for an odd length or a non-hex digit; `Err` for out of memory.
 pub(crate) fn hex_into(digits: &[u8], out: &mut Vec<u8>) -> Option<Result<(), ()>> {
-    if digits.len() % 2 != 0 {
+    if !digits.len().is_multiple_of(2) {
         return None;
     }
     if out.try_reserve(digits.len() / 2).is_err() {

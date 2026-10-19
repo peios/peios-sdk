@@ -115,7 +115,7 @@ fn build_send_control(token_fd: c_int, fds: &[c_int]) -> Vec<u8> {
         );
     }
     if !fds.is_empty() {
-        let mut data = Vec::with_capacity(fds.len() * size_of::<c_int>());
+        let mut data = Vec::with_capacity(core::mem::size_of_val(fds));
         for fd in fds {
             data.extend_from_slice(&fd.to_ne_bytes());
         }
@@ -172,7 +172,7 @@ unsafe fn deliver_control(buf: &[u8], msg: &mut peios_socket_message) {
     msg.fd_count = 0;
     msg.flags = 0;
     for cmsg in parse_control(buf) {
-        let ints = cmsg.data.chunks_exact(size_of::<c_int>());
+        let (ints, _) = cmsg.data.as_chunks::<{ size_of::<c_int>() }>();
         match (cmsg.level, cmsg.kind) {
             (SOL_KACS, KACS_SCM_TOKEN) => {
                 for bytes in ints {
@@ -213,6 +213,10 @@ unsafe fn deliver_control(buf: &[u8], msg: &mut peios_socket_message) {
 /// `EACCES` if the fd lacks `TOKEN_IMPERSONATE`, `EPERM` if attaching would
 /// lower the token's level. The descriptors are duplicated into the receiver
 /// on delivery; the caller keeps its own.
+///
+/// # Safety
+/// `buf` must be readable for `len` bytes and `fds` for `fd_count` aligned descriptors when their
+/// lengths are nonzero. All supplied descriptors must remain open until the call returns.
 #[no_mangle]
 pub unsafe extern "C" fn peios_socket_send_message(
     sock_fd: c_int,
@@ -270,6 +274,11 @@ pub unsafe extern "C" fn peios_socket_send_message(
 /// already closed: a token beyond the first, or a descriptor beyond `fd_cap`,
 /// is closed rather than leaked. `msg->flags` reports truncation; a caller
 /// that cannot accept a truncated message closes what it was handed.
+///
+/// # Safety
+/// `buf` must be exclusively writable for `cap` bytes. A non-null `msg` must be initialized and
+/// exclusively writable, and its `fds` array writable for `fd_cap` descriptors. The caller owns
+/// and must close every descriptor returned on success.
 #[no_mangle]
 pub unsafe extern "C" fn peios_socket_recv_message(
     sock_fd: c_int,
@@ -340,6 +349,10 @@ pub unsafe extern "C" fn peios_socket_recv_message(
 /// the process that connected (or that this end was paired with), which is
 /// what a service opens the peer's primary token through — never a PID the
 /// peer names.
+///
+/// # Safety
+/// The socket descriptor must remain open and must not be reused concurrently. The caller owns
+/// the returned descriptor and must close it.
 #[no_mangle]
 pub unsafe extern "C" fn peios_socket_peer_pidfd(sock_fd: c_int) -> c_int {
     let mut fd: c_int = -1;

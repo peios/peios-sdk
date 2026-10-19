@@ -66,6 +66,11 @@ fn adjust_default_args(
 // ----------------------------------------------------------------------------
 
 /// `peios_token_adjust_privileges` — apply an array of privilege adjustments.
+///
+/// # Safety
+/// Descriptor arguments must remain open and must not be reused concurrently. `entries` must
+/// point to `count` readable entries. A non-null `prev_enabled` must be aligned and writable for
+/// one u64.
 #[no_mangle]
 pub unsafe extern "C" fn peios_token_adjust_privileges(
     fd: c_int,
@@ -89,6 +94,9 @@ pub unsafe extern "C" fn peios_token_adjust_privileges(
 }
 
 /// `peios_token_reset_privileges` — restore enabled := enabled-by-default.
+///
+/// # Safety
+/// Descriptor arguments must remain open and must not be reused concurrently.
 #[no_mangle]
 pub unsafe extern "C" fn peios_token_reset_privileges(fd: c_int) -> c_int {
     let entry = kacs_priv_entry {
@@ -108,6 +116,11 @@ pub unsafe extern "C" fn peios_token_reset_privileges(fd: c_int) -> c_int {
 }
 
 /// `peios_token_adjust_groups` — apply an array of group adjustments.
+///
+/// # Safety
+/// Descriptor arguments must remain open and must not be reused concurrently. `entries` must
+/// point to `count` readable entries. A non-null `prev_state` must be aligned and writable for
+/// `KACS_TOKEN_GROUP_MASK_WORDS` u64 values.
 #[no_mangle]
 pub unsafe extern "C" fn peios_token_adjust_groups(
     fd: c_int,
@@ -136,6 +149,9 @@ pub unsafe extern "C" fn peios_token_adjust_groups(
 }
 
 /// `peios_token_reset_groups` — restore the creation-time group state.
+///
+/// # Safety
+/// Descriptor arguments must remain open and must not be reused concurrently.
 #[no_mangle]
 pub unsafe extern "C" fn peios_token_reset_groups(fd: c_int) -> c_int {
     let entry = kacs_group_entry {
@@ -159,6 +175,9 @@ pub unsafe extern "C" fn peios_token_reset_groups(fd: c_int) -> c_int {
 // ----------------------------------------------------------------------------
 
 /// `peios_token_duplicate` — deep-clone this token; returns the new fd.
+///
+/// # Safety
+/// Descriptor arguments must remain open and must not be reused concurrently.
 #[no_mangle]
 pub unsafe extern "C" fn peios_token_duplicate(
     fd: c_int,
@@ -192,6 +211,11 @@ fn pack_restrict(deny: &[u32], sids: &[&[u8]]) -> Result<Vec<u8>, ()> {
 }
 
 /// `peios_token_restrict` — create a filtered token; returns the new fd.
+///
+/// # Safety
+/// Descriptor arguments must remain open and must not be reused concurrently. A non-null `spec`
+/// must be readable; every nonempty array and each SID buffer must be readable for its
+/// corresponding count or length.
 #[no_mangle]
 pub unsafe extern "C" fn peios_token_restrict(
     fd: c_int,
@@ -260,6 +284,9 @@ pub unsafe extern "C" fn peios_token_restrict(
 }
 
 /// `peios_token_install` — commit this primary token on the calling process.
+///
+/// # Safety
+/// Descriptor arguments must remain open and must not be reused concurrently.
 #[no_mangle]
 pub unsafe extern "C" fn peios_token_install(fd: c_int) -> c_int {
     if ioctl(fd, KACS_IOC_INSTALL as c_ulong, core::ptr::null_mut()) < 0 {
@@ -269,6 +296,9 @@ pub unsafe extern "C" fn peios_token_install(fd: c_int) -> c_int {
 }
 
 /// `peios_token_impersonate` — impersonate this token on the calling thread.
+///
+/// # Safety
+/// Descriptor arguments must remain open and must not be reused concurrently.
 #[no_mangle]
 pub unsafe extern "C" fn peios_token_impersonate(fd: c_int) -> c_int {
     if ioctl(fd, KACS_IOC_IMPERSONATE as c_ulong, core::ptr::null_mut()) < 0 {
@@ -278,6 +308,9 @@ pub unsafe extern "C" fn peios_token_impersonate(fd: c_int) -> c_int {
 }
 
 /// `peios_token_link` — link an elevated + filtered pair in a LogonSession.
+///
+/// # Safety
+/// Descriptor arguments must remain open and must not be reused concurrently.
 #[no_mangle]
 pub unsafe extern "C" fn peios_token_link(
     elevated_fd: c_int,
@@ -298,6 +331,9 @@ pub unsafe extern "C" fn peios_token_link(
 }
 
 /// `peios_token_get_linked` — open this token's linked partner; returns its fd.
+///
+/// # Safety
+/// Descriptor arguments must remain open and must not be reused concurrently.
 #[no_mangle]
 pub unsafe extern "C" fn peios_token_get_linked(fd: c_int) -> c_int {
     let mut args = kacs_get_linked_token_args { result_fd: -1 };
@@ -310,6 +346,10 @@ pub unsafe extern "C" fn peios_token_get_linked(fd: c_int) -> c_int {
 /// `peios_token_adjust_default` — replace the default DACL and/or owner/group
 /// indices. A null `dacl` leaves the DACL unchanged; `dacl != NULL` with
 /// `len == 0` clears it; an index of `0xFFFF` leaves that index unchanged.
+///
+/// # Safety
+/// Descriptor arguments must remain open and must not be reused concurrently. A non-null `dacl`
+/// must be readable for `len` bytes.
 #[no_mangle]
 pub unsafe extern "C" fn peios_token_adjust_default(
     fd: c_int,
@@ -333,6 +373,9 @@ pub unsafe extern "C" fn peios_token_adjust_default(
 
 /// `peios_token_set_interactivity_scope` — change the token's interactive
 /// environment scope.
+///
+/// # Safety
+/// Descriptor arguments must remain open and must not be reused concurrently.
 #[no_mangle]
 pub unsafe extern "C" fn peios_token_set_interactivity_scope(fd: c_int, scope: u32) -> c_int {
     let mut value = scope;

@@ -22,7 +22,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <stdbool.h>
-#include <sys/types.h>		/* ssize_t */
+#include <sys/types.h> /* ssize_t */
 
 #ifdef __cplusplus
 extern "C" {
@@ -35,15 +35,15 @@ extern "C" {
 typedef struct peios_mp_writer peios_mp_writer;
 
 peios_mp_writer *peios_mp_writer_new(void);
-void		 peios_mp_writer_free(peios_mp_writer *w);
-void		 peios_mp_writer_reset(peios_mp_writer *w);
+void peios_mp_writer_free(peios_mp_writer *w);
+void peios_mp_writer_reset(peios_mp_writer *w);
 
 void peios_mp_write_nil(peios_mp_writer *w);
 void peios_mp_write_bool(peios_mp_writer *w, bool v);
 void peios_mp_write_int(peios_mp_writer *w, int64_t v);
 void peios_mp_write_uint(peios_mp_writer *w, uint64_t v);
 void peios_mp_write_float(peios_mp_writer *w, double v);
-void peios_mp_write_str(peios_mp_writer *w, const char *s, size_t len);	/* UTF-8 */
+void peios_mp_write_str(peios_mp_writer *w, const char *s, size_t len); /* UTF-8 */
 void peios_mp_write_bin(peios_mp_writer *w, const void *b, size_t len);
 
 /* Container headers: write the header, then exactly @count values (a map needs
@@ -77,15 +77,15 @@ int peios_mp_writer_error(const peios_mp_writer *w);
 /* The value kind reported by peios_mp_peek(). Integers (signed and unsigned, all
  * widths) report as PEIOS_MP_INT; read them with peios_mp_read_int/_uint. */
 enum peios_mp_type {
-	PEIOS_MP_NIL	= 0,
-	PEIOS_MP_BOOL	= 1,
-	PEIOS_MP_INT	= 2,
-	PEIOS_MP_FLOAT	= 3,
-	PEIOS_MP_STR	= 4,
-	PEIOS_MP_BIN	= 5,
-	PEIOS_MP_ARRAY	= 6,
-	PEIOS_MP_MAP	= 7,
-	PEIOS_MP_EXT	= 8,
+    PEIOS_MP_NIL = 0,
+    PEIOS_MP_BOOL = 1,
+    PEIOS_MP_INT = 2,
+    PEIOS_MP_FLOAT = 3,
+    PEIOS_MP_STR = 4,
+    PEIOS_MP_BIN = 5,
+    PEIOS_MP_ARRAY = 6,
+    PEIOS_MP_MAP = 7,
+    PEIOS_MP_EXT = 8,
 };
 
 /* A decode cursor over a borrowed buffer; stack-allocatable. Opaque storage —
@@ -94,10 +94,10 @@ enum peios_mp_type {
  * Borrowed str/bin/ext pointers point into the original buffer and are valid for
  * as long as it is. */
 struct peios_mp_reader {
-	uint64_t _opaque[4];
+    uint64_t _opaque[4];
 };
 
-void   peios_mp_reader_init(struct peios_mp_reader *r, const void *buf, size_t len);
+void peios_mp_reader_init(struct peios_mp_reader *r, const void *buf, size_t len);
 size_t peios_mp_reader_remaining(const struct peios_mp_reader *r);
 
 /* The peios_mp_type of the next value without consuming it, or -1 at

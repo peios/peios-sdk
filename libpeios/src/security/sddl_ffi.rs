@@ -1,7 +1,7 @@
 //! SDDL codec + SD inheritance C ABI — `peios_sddl_*` / `peios_sd_*`
 //! (`<peios/security.h>`).
 //!
-//! Thin `extern "C"` shims over the vendored pure-Rust [`super::sddl`] logic.
+//! Thin `extern "C"` shims over the pure-Rust [`super::sddl`] logic.
 //! Every byte-returning entry follows libpeios's size-probe contract via
 //! [`crate::abi::emit_bytes`] / [`emit_str`]: pass `cap == 0` (or a NULL
 //! buffer) to probe for the required length, then call again with a buffer
@@ -23,21 +23,34 @@ const MAX_SDDL_TEXT: usize = 65536;
 
 /// Borrow `len` bytes at `ptr`, or `None` if `ptr` is NULL. A zero-length
 /// view of a NULL pointer is treated as invalid (the codec needs real input).
-unsafe fn input(ptr: *const c_void, len: usize) -> Option<&'static [u8]> {
+///
+/// # Safety
+/// A non-NULL `ptr` must remain readable for `len` bytes for the borrowed lifetime.
+unsafe fn input<'a>(ptr: *const c_void, len: usize) -> Option<&'a [u8]> {
     if ptr.is_null() {
         return None;
     }
-    Some(slice::from_raw_parts(ptr as *const u8, len))
+    // SAFETY: the caller guarantees readable storage for the borrowed lifetime.
+    Some(unsafe { slice::from_raw_parts(ptr as *const u8, len) })
 }
 
 /// Parse SDDL text into self-relative SECURITY_DESCRIPTOR wire bytes.
+///
+/// # Safety
+/// Non-NULL input buffers must remain readable for their stated lengths;
+/// text inputs must be NUL-terminated. A non-NULL output must be writable
+/// for `cap` bytes. Typed input pointers must be aligned and initialized.
 #[no_mangle]
 pub unsafe extern "C" fn peios_sddl_parse_sd(
     out: *mut c_void,
     cap: usize,
     sddl: *const c_char,
 ) -> isize {
-    let Some(bytes) = (if sddl.is_null() { None } else { cstr_bytes(sddl, MAX_SDDL_TEXT) }) else {
+    let Some(bytes) = (if sddl.is_null() {
+        None
+    } else {
+        cstr_bytes(sddl, MAX_SDDL_TEXT)
+    }) else {
         set_errno(libc::EINVAL);
         return -1;
     };
@@ -56,6 +69,11 @@ pub unsafe extern "C" fn peios_sddl_parse_sd(
 
 /// Render a self-relative SECURITY_DESCRIPTOR to NUL-terminated SDDL text.
 /// Returns the string length excluding the NUL (so allocate `len + 1`).
+///
+/// # Safety
+/// Non-NULL input buffers must remain readable for their stated lengths;
+/// text inputs must be NUL-terminated. A non-NULL output must be writable
+/// for `cap` bytes. Typed input pointers must be aligned and initialized.
 #[no_mangle]
 pub unsafe extern "C" fn peios_sddl_format_sd(
     out: *mut c_char,
@@ -81,13 +99,22 @@ pub unsafe extern "C" fn peios_sddl_format_sd(
 }
 
 /// Parse an SDDL conditional expression to its `"artx"` callback-ACE bytecode.
+///
+/// # Safety
+/// Non-NULL input buffers must remain readable for their stated lengths;
+/// text inputs must be NUL-terminated. A non-NULL output must be writable
+/// for `cap` bytes. Typed input pointers must be aligned and initialized.
 #[no_mangle]
 pub unsafe extern "C" fn peios_sddl_parse_condition(
     out: *mut c_void,
     cap: usize,
     expr: *const c_char,
 ) -> isize {
-    let Some(bytes) = (if expr.is_null() { None } else { cstr_bytes(expr, MAX_SDDL_TEXT) }) else {
+    let Some(bytes) = (if expr.is_null() {
+        None
+    } else {
+        cstr_bytes(expr, MAX_SDDL_TEXT)
+    }) else {
         set_errno(libc::EINVAL);
         return -1;
     };
@@ -106,6 +133,11 @@ pub unsafe extern "C" fn peios_sddl_parse_condition(
 
 /// Render `"artx"` callback-ACE bytecode back to NUL-terminated SDDL
 /// conditional-expression text (no outer parens).
+///
+/// # Safety
+/// Non-NULL input buffers must remain readable for their stated lengths;
+/// text inputs must be NUL-terminated. A non-NULL output must be writable
+/// for `cap` bytes. Typed input pointers must be aligned and initialized.
 #[no_mangle]
 pub unsafe extern "C" fn peios_sddl_format_condition(
     out: *mut c_char,
@@ -128,6 +160,11 @@ pub unsafe extern "C" fn peios_sddl_format_condition(
 
 /// Reinherit a child SD's DACL from a parent SD: [`peios_sd_reinherit_ex`]
 /// with no generic mapping and `DACL_SECURITY_INFORMATION`.
+///
+/// # Safety
+/// Non-NULL input buffers must remain readable for their stated lengths;
+/// text inputs must be NUL-terminated. A non-NULL output must be writable
+/// for `cap` bytes. Typed input pointers must be aligned and initialized.
 #[no_mangle]
 pub unsafe extern "C" fn peios_sd_reinherit(
     out: *mut c_void,
@@ -159,6 +196,11 @@ pub unsafe extern "C" fn peios_sd_reinherit(
 /// `mapping` (NULL: generic rights stay as written). Both inputs
 /// self-relative; output self-relative. `is_container != 0` for a
 /// container child.
+///
+/// # Safety
+/// Non-NULL input buffers must remain readable for their stated lengths;
+/// text inputs must be NUL-terminated. A non-NULL output must be writable
+/// for `cap` bytes. Typed input pointers must be aligned and initialized.
 #[no_mangle]
 pub unsafe extern "C" fn peios_sd_reinherit_ex(
     out: *mut c_void,
@@ -176,7 +218,12 @@ pub unsafe extern "C" fn peios_sd_reinherit_ex(
         set_errno(libc::EINVAL);
         return -1;
     };
-    let mapping = mapping.as_ref().map(|m| GenericMapping { read: m.read, write: m.write, execute: m.execute, all: m.all });
+    let mapping = mapping.as_ref().map(|m| GenericMapping {
+        read: m.read,
+        write: m.write,
+        execute: m.execute,
+        all: m.all,
+    });
     match inherit::reinherit_with(parent, child, is_container != 0, mapping, info) {
         Ok(v) => emit_bytes(&v, out as *mut u8, cap),
         Err(_) => {
@@ -189,6 +236,11 @@ pub unsafe extern "C" fn peios_sd_reinherit_ex(
 /// Drop ACEs carrying `ACE_FLAG_INHERITED` from the ACLs selected by `info`
 /// (a mask of `*_SECURITY_INFORMATION` bits; DACL/SACL honored, others
 /// ignored; neither selected → input copied verbatim). Output self-relative.
+///
+/// # Safety
+/// Non-NULL input buffers must remain readable for their stated lengths;
+/// text inputs must be NUL-terminated. A non-NULL output must be writable
+/// for `cap` bytes. Typed input pointers must be aligned and initialized.
 #[no_mangle]
 pub unsafe extern "C" fn peios_sd_strip_inherited(
     out: *mut c_void,
@@ -301,12 +353,23 @@ mod tests {
 
         let sddl = CString::new("O:SYG:BAD:(A;;FA;;;BA)").unwrap();
         let sd = unsafe { collect_bytes(|o, c| peios_sddl_parse_sd(o, c, sddl.as_ptr())) };
-        let need =
-            unsafe { peios_sddl_format_sd(core::ptr::null_mut(), 0, sd.as_ptr() as *const c_void, sd.len()) };
+        let need = unsafe {
+            peios_sddl_format_sd(
+                core::ptr::null_mut(),
+                0,
+                sd.as_ptr() as *const c_void,
+                sd.len(),
+            )
+        };
         assert!(need > 1);
         let mut tiny = vec![0u8; 1];
         let r = unsafe {
-            peios_sddl_format_sd(tiny.as_mut_ptr() as *mut c_char, 1, sd.as_ptr() as *const c_void, sd.len())
+            peios_sddl_format_sd(
+                tiny.as_mut_ptr() as *mut c_char,
+                1,
+                sd.as_ptr() as *const c_void,
+                sd.len(),
+            )
         };
         assert_eq!(r, -1);
         assert_eq!(crate::error::get_errno(), libc::ERANGE);

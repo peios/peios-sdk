@@ -120,6 +120,11 @@ unsafe fn emit_sid(authority: u64, subs: &[u32], out: *mut c_void, cap: usize) -
 // ----------------------------------------------------------------------------
 
 /// `peios_sid_build` — encode a binary SID from its parts.
+///
+/// # Safety
+/// Non-NULL input buffers must be readable for their stated lengths and
+/// typed arrays must be aligned and initialized. String inputs must be
+/// NUL-terminated. A non-NULL output must be writable for `cap` bytes.
 #[no_mangle]
 pub unsafe extern "C" fn peios_sid_build(
     out: *mut c_void,
@@ -151,6 +156,11 @@ pub unsafe extern "C" fn peios_sid_build(
 /// (`BA`, `SY`, `WD`, `BU`, the integrity labels, …) — the latter resolved
 /// through the SDDL SID-alias table. Domain-relative aliases that need a
 /// machine/domain SID prefix are rejected with `EINVAL`.
+///
+/// # Safety
+/// Non-NULL input buffers must be readable for their stated lengths and
+/// typed arrays must be aligned and initialized. String inputs must be
+/// NUL-terminated. A non-NULL output must be writable for `cap` bytes.
 #[no_mangle]
 pub unsafe extern "C" fn peios_sid_parse_string(
     out: *mut c_void,
@@ -183,6 +193,11 @@ pub unsafe extern "C" fn peios_sid_parse_string(
 }
 
 /// `peios_sid_format` — format a binary SID as its SDDL string.
+///
+/// # Safety
+/// Non-NULL input buffers must be readable for their stated lengths and
+/// typed arrays must be aligned and initialized. String inputs must be
+/// NUL-terminated. A non-NULL output must be writable for `cap` bytes.
 #[no_mangle]
 pub unsafe extern "C" fn peios_sid_format(
     sid: *const c_void,
@@ -211,6 +226,11 @@ pub unsafe extern "C" fn peios_sid_format(
 }
 
 /// `peios_sid_integrity` — construct an integrity-label SID `S-1-16-<rid>`.
+///
+/// # Safety
+/// Non-NULL input buffers must be readable for their stated lengths and
+/// typed arrays must be aligned and initialized. String inputs must be
+/// NUL-terminated. A non-NULL output must be writable for `cap` bytes.
 #[no_mangle]
 pub unsafe extern "C" fn peios_sid_integrity(
     out: *mut c_void,
@@ -221,6 +241,11 @@ pub unsafe extern "C" fn peios_sid_integrity(
 }
 
 /// `peios_sid_logon` — construct a logon SID `S-1-5-5-<hi>-<lo>`.
+///
+/// # Safety
+/// Non-NULL input buffers must be readable for their stated lengths and
+/// typed arrays must be aligned and initialized. String inputs must be
+/// NUL-terminated. A non-NULL output must be writable for `cap` bytes.
 #[no_mangle]
 pub unsafe extern "C" fn peios_sid_logon(out: *mut c_void, cap: usize, session_id: u64) -> isize {
     let hi = (session_id >> 32) as u32;
@@ -232,6 +257,11 @@ pub unsafe extern "C" fn peios_sid_logon(out: *mut c_void, cap: usize, session_i
 ///
 /// `which` is the C `enum peios_wks` value (an `int`); out-of-range yields
 /// `EINVAL`.
+///
+/// # Safety
+/// Non-NULL input buffers must be readable for their stated lengths and
+/// typed arrays must be aligned and initialized. String inputs must be
+/// NUL-terminated. A non-NULL output must be writable for `cap` bytes.
 #[no_mangle]
 pub unsafe extern "C" fn peios_sid_well_known(out: *mut c_void, cap: usize, which: c_int) -> isize {
     let (authority, subs): (u64, &[u32]) = match which {
@@ -261,6 +291,10 @@ pub unsafe extern "C" fn peios_sid_well_known(out: *mut c_void, cap: usize, whic
 // ----------------------------------------------------------------------------
 
 /// `peios_sid_valid` — structurally valid SID of exactly `len` bytes?
+///
+/// # Safety
+/// Non-NULL input buffers must remain readable for their stated lengths
+/// throughout this call.
 #[no_mangle]
 pub unsafe extern "C" fn peios_sid_valid(sid: *const c_void, len: usize) -> bool {
     if sid.is_null() {
@@ -291,6 +325,10 @@ pub unsafe extern "C" fn peios_sid_length(sid: *const c_void) -> usize {
 }
 
 /// `peios_sid_equal` — exact binary equality.
+///
+/// # Safety
+/// Non-NULL input buffers must remain readable for their stated lengths
+/// throughout this call.
 #[no_mangle]
 pub unsafe extern "C" fn peios_sid_equal(
     a: *const c_void,
@@ -311,6 +349,10 @@ pub unsafe extern "C" fn peios_sid_equal(
 }
 
 /// `peios_sid_rid` — the RID (last sub-authority) of `sid`, or 0 if it has none.
+///
+/// # Safety
+/// Non-NULL input buffers must remain readable for their stated lengths
+/// throughout this call.
 #[no_mangle]
 pub unsafe extern "C" fn peios_sid_rid(sid: *const c_void, len: usize) -> u32 {
     if sid.is_null() {

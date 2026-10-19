@@ -10,9 +10,8 @@
 //! The implementation mirrors the standard library's Unix `System` allocator:
 //! the common case (alignment within libc's `max_align_t`) goes straight to
 //! `malloc`/`realloc`, and the over-aligned case falls back to `posix_memalign`.
-//! In practice the libraries only ever allocate `Vec<u8>` / `Vec<u32>` (alignment
-//! <= 4), so the fast path is always taken; the aligned path exists for
-//! correctness, not performance.
+//! Byte buffers and ordinary builder structs use the fast path. The aligned
+//! path preserves the allocator contract for any more strictly aligned type.
 //!
 //! This crate provides the allocator *type* only. The `#[global_allocator]` static
 //! that installs it lives in each consuming cdylib, gated out of `cfg(test)` builds
@@ -20,6 +19,7 @@
 
 use core::alloc::{GlobalAlloc, Layout};
 use core::ptr;
+
 use libc::c_void;
 
 /// Alignment guaranteed by libc `malloc` on the targets we ship (x86_64 LP64):
@@ -30,9 +30,14 @@ const MIN_ALIGN: usize = 16;
 /// consuming cdylib with `#[global_allocator] static G: LibcAllocator = LibcAllocator;`.
 pub struct LibcAllocator;
 
+// SAFETY: every successful allocation satisfies its requested layout and is
+// owned by libc. Over-aligned reallocations copy only the live overlap and leave
+// the original allocation untouched when allocating its replacement fails.
 unsafe impl GlobalAlloc for LibcAllocator {
     #[inline]
     unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
+        // SAFETY: GlobalAlloc requires a nonzero layout; libc provides MIN_ALIGN
+        // or aligned_alloc raises the requested alignment to its accepted floor.
         if layout.align() <= MIN_ALIGN && layout.align() <= layout.size() {
             libc::malloc(layout.size()) as *mut u8
         } else {
@@ -42,6 +47,8 @@ unsafe impl GlobalAlloc for LibcAllocator {
 
     #[inline]
     unsafe fn alloc_zeroed(&self, layout: Layout) -> *mut u8 {
+        // SAFETY: calloc initializes its allocation; the fallback writes exactly
+        // layout.size() bytes only after allocation succeeds.
         if layout.align() <= MIN_ALIGN && layout.align() <= layout.size() {
             libc::calloc(layout.size(), 1) as *mut u8
         } else {
@@ -55,11 +62,14 @@ unsafe impl GlobalAlloc for LibcAllocator {
 
     #[inline]
     unsafe fn dealloc(&self, ptr: *mut u8, _layout: Layout) {
+        // SAFETY: GlobalAlloc callers return a live allocation owned by this allocator.
         libc::free(ptr as *mut c_void);
     }
 
     #[inline]
     unsafe fn realloc(&self, ptr: *mut u8, layout: Layout, new_size: usize) -> *mut u8 {
+        // SAFETY: the caller provides the original allocation and layout, and a
+        // nonzero valid replacement size. Both branches preserve ownership on failure.
         if layout.align() <= MIN_ALIGN && layout.align() <= new_size {
             libc::realloc(ptr as *mut c_void, new_size) as *mut u8
         } else {
@@ -98,6 +108,8 @@ unsafe fn realloc_aligned(
     let new_ptr = alloc.alloc(new_layout);
     if !new_ptr.is_null() {
         let copied = core::cmp::min(old_layout.size(), new_size);
+        // SAFETY: the fresh allocation cannot overlap the old one; copied is
+        // bounded by both live allocations. Free only after the copy succeeds.
         ptr::copy_nonoverlapping(ptr, new_ptr, copied);
         alloc.dealloc(ptr, old_layout);
     }

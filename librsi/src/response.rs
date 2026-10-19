@@ -199,7 +199,7 @@ unsafe fn orphaned_guid_bytes<'a>(
 
     let bytes = core::slice::from_raw_parts(orphaned_guids, guid_bytes_len);
     let mut guids = guid_vec_with_capacity(orphaned_count as usize)?;
-    for guid_bytes in bytes.chunks_exact(16) {
+    for guid_bytes in bytes.as_chunks::<16>().0 {
         let mut guid = [0u8; 16];
         guid.copy_from_slice(guid_bytes);
         guids.push(guid);

@@ -5,12 +5,13 @@
 // callers describe intent ("allow Everyone GENERIC_READ") rather than
 // hand-assembling byte buffers.
 
+use alloc::vec;
+use alloc::vec::Vec;
+
 use crate::security::sddl::Result;
 use crate::security::sddl::claims::ClaimAttribute;
 use crate::security::sddl::condition::Condition;
 use crate::security::sddl::Error;
-use alloc::vec;
-use alloc::vec::Vec;
 use crate::security::sddl::codec::{
     ACE_INHERITED_OBJECT_TYPE_PRESENT, ACE_OBJECT_TYPE_PRESENT, ACE_TYPE_ACCESS_ALLOWED,
     ACE_TYPE_ACCESS_ALLOWED_CALLBACK, ACE_TYPE_ACCESS_ALLOWED_CALLBACK_OBJECT,
@@ -327,7 +328,12 @@ impl AceBuilder {
         )
     }
 
-    pub(crate) fn callback(ace_type: u8, sid: Sid, mask: u32, condition: &Condition) -> Result<Self> {
+    pub(crate) fn callback(
+        ace_type: u8,
+        sid: Sid,
+        mask: u32,
+        condition: &Condition,
+    ) -> Result<Self> {
         // Non-object callback body: mask, SID, then the conditional
         // expression as ApplicationData.
         let mut body = Vec::new();
@@ -716,7 +722,13 @@ mod tests {
             assert_eq!(&ace[payload_start..payload_start + entry.len()], &entry);
             assert!(ace[payload_start + entry.len()..].iter().all(|b| *b == 0));
         }
-        assert_eq!(AceBuilder::raw(0x12, alloc::vec![0; 65528]).unwrap().build().len(), 65532);
+        assert_eq!(
+            AceBuilder::raw(0x12, alloc::vec![0; 65528])
+                .unwrap()
+                .build()
+                .len(),
+            65532
+        );
         assert!(AceBuilder::raw(0x12, alloc::vec![0; 65529]).is_err());
     }
 
