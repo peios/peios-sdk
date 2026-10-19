@@ -151,7 +151,7 @@ Any added, removed, or changed diagnostic fails the component check.
 Run the publication-context check from the standard workspace layout:
 
 ```sh
-tools/check-docs --context ../panorama/docs
+tools/check-docs --context ../learn
 ```
 
 The checker copies the context without generated output or caches,
