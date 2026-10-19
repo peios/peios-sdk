@@ -1,0 +1,3 @@
+title = "SDK Reference"
+short = "SDK Reference"
+description = "Header-by-header reference for the Peios SDK — the conventions every call follows, then security descriptors, tokens, access checks, files, processes, the registry, events, msgpack, and the registry-source interface."

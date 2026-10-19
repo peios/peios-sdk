@@ -1,0 +1,650 @@
+[
+  {
+    "source": "libpeios/docs/security-impl-map.md",
+    "archive": "docs/archive/documentation/repository/libpeios/docs/security-impl-map.md",
+    "sha256": "2b8de3448d6c2bd1551ac0f65ff0dfd285980347cca897fbf0d8429a5c50066e",
+    "destination": "docs/design.md"
+  },
+  {
+    "source": "libpeios/docs/design-notes.md",
+    "archive": "docs/archive/documentation/repository/libpeios/docs/design-notes.md",
+    "sha256": "c679dbc598547ebac8dd6b1cca763b160116ebb71b412ef717dd438583d4b788",
+    "destination": "docs/design.md"
+  },
+  {
+    "source": "libpeios/docs/kacs-abi-reference.md",
+    "archive": "docs/archive/documentation/repository/libpeios/docs/kacs-abi-reference.md",
+    "sha256": "64f19144c50c58253f7907402a25b0b8db7dce1a8ae7a1b39d3c9951af719009",
+    "destination": "docs/learn/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/200--sdk-access-control.topic/400--securing-files.md"
+  },
+  {
+    "source": "libpeios/abi/README.md",
+    "archive": "docs/archive/documentation/repository/libpeios/abi/README.md",
+    "sha256": "d44ae52048d1d41e22911ee5927bd32f4aa7a89330acd70fdb48a74afc85a8a7",
+    "destination": "docs/abi.md"
+  },
+  {
+    "source": "librsi/docs/design-notes.md",
+    "archive": "docs/archive/documentation/repository/librsi/docs/design-notes.md",
+    "sha256": "f24e06caadd690d16ae3a38d4b206083d6354e30a2e14b03d30b3c8ac4226078",
+    "destination": "docs/design.md"
+  },
+  {
+    "source": "librsi/abi/README.md",
+    "archive": "docs/archive/documentation/repository/librsi/abi/README.md",
+    "sha256": "c8374e3569051bdfeb7f290c03394b63aab23bbb4da729d12beda5fdcce6e492",
+    "destination": "docs/abi.md"
+  },
+  {
+    "source": "learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/trail.toml",
+    "archive": "docs/archive/documentation/learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/trail.toml",
+    "destination": "docs/learn/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/trail.toml",
+    "sha256": "e4db47710704ceb509284c03957ae7b692bb3169c50e138ce7fb89fbf2c1f361"
+  },
+  {
+    "source": "learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/100--sdk-basics.topic/200--installing-and-linking.md",
+    "archive": "docs/archive/documentation/learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/100--sdk-basics.topic/200--installing-and-linking.md",
+    "destination": "docs/learn/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/100--sdk-basics.topic/200--installing-and-linking.md",
+    "sha256": "b56af9e034598bc95f4cae452f6ed07b5e2e95329c1491917b02cd617385fc94"
+  },
+  {
+    "source": "learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/100--sdk-basics.topic/trail.toml",
+    "archive": "docs/archive/documentation/learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/100--sdk-basics.topic/trail.toml",
+    "destination": "docs/learn/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/100--sdk-basics.topic/trail.toml",
+    "sha256": "3e0e6186074c9eec258ff67e48090abc4e78050b908ee2d861822e3ed6ce3266"
+  },
+  {
+    "source": "learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/100--sdk-basics.topic/300--your-first-program.md",
+    "archive": "docs/archive/documentation/learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/100--sdk-basics.topic/300--your-first-program.md",
+    "destination": "docs/learn/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/100--sdk-basics.topic/300--your-first-program.md",
+    "sha256": "8d450ddff10dddd1d0ddbbd2ba7541c1835a0675211382182f020ba0d658c5fa"
+  },
+  {
+    "source": "learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/100--sdk-basics.topic/100--what-is-the-peios-sdk.md",
+    "archive": "docs/archive/documentation/learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/100--sdk-basics.topic/100--what-is-the-peios-sdk.md",
+    "destination": "docs/learn/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/100--sdk-basics.topic/100--what-is-the-peios-sdk.md",
+    "sha256": "6a8a15a431b095f7ebfb7928696e595da9e2e30e11291a4760020adb73d24e55"
+  },
+  {
+    "source": "learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/200--sdk-access-control.topic/300--checking-access.md",
+    "archive": "docs/archive/documentation/learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/200--sdk-access-control.topic/300--checking-access.md",
+    "destination": "docs/learn/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/200--sdk-access-control.topic/300--checking-access.md",
+    "sha256": "a685d22521fda09ef89171564691bddb187a4a5dd367ed494bba35128fdb4bdd"
+  },
+  {
+    "source": "learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/200--sdk-access-control.topic/500--hardening-a-process.md",
+    "archive": "docs/archive/documentation/learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/200--sdk-access-control.topic/500--hardening-a-process.md",
+    "destination": "docs/learn/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/200--sdk-access-control.topic/500--hardening-a-process.md",
+    "sha256": "6b535516bc0515a7582fb3f28f7b1b93eaa8e0cd4382cfe8bc4ae0101dd53911"
+  },
+  {
+    "source": "learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/200--sdk-access-control.topic/200--working-with-tokens.md",
+    "archive": "docs/archive/documentation/learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/200--sdk-access-control.topic/200--working-with-tokens.md",
+    "destination": "docs/learn/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/200--sdk-access-control.topic/200--working-with-tokens.md",
+    "sha256": "33ba27faa213431371465f0795ef26a361e122699886ed1cec9be40ad169fbf5",
+    "retained_sections": [
+      "learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/100--sdk-basics.topic/700--token-message-bindings.md"
+    ]
+  },
+  {
+    "source": "learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/200--sdk-access-control.topic/trail.toml",
+    "archive": "docs/archive/documentation/learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/200--sdk-access-control.topic/trail.toml",
+    "destination": "docs/learn/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/200--sdk-access-control.topic/trail.toml",
+    "sha256": "1ed736bc61f6bc80ff2dc2be75f7f147038aef8ff9705ce7be1f2f3bf444065d"
+  },
+  {
+    "source": "learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/200--sdk-access-control.topic/100--overview.md",
+    "archive": "docs/archive/documentation/learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/200--sdk-access-control.topic/100--overview.md",
+    "destination": "docs/learn/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/200--sdk-access-control.topic/100--overview.md",
+    "sha256": "648170348daf0e508069c452d40db8094958aa887729ca07b984b3be0b490c99"
+  },
+  {
+    "source": "learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/200--sdk-access-control.topic/400--securing-files.md",
+    "archive": "docs/archive/documentation/learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/200--sdk-access-control.topic/400--securing-files.md",
+    "destination": "docs/learn/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/200--sdk-access-control.topic/400--securing-files.md",
+    "sha256": "f220c286ca38970b7c69f5969be04094e8037036684776b52cc6ca5879e33612"
+  },
+  {
+    "source": "learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/trail.toml",
+    "archive": "docs/archive/documentation/learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/trail.toml",
+    "destination": "docs/learn/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/trail.toml",
+    "sha256": "39da13cad3aa9f50c14d8d53e9f6a8adb406dad0d65fb6bc1508641566fb82e2"
+  },
+  {
+    "source": "learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/500--registry-sources.topic/200--registering-a-source.md",
+    "archive": "docs/archive/documentation/learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/500--registry-sources.topic/200--registering-a-source.md",
+    "destination": "docs/learn/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/500--registry-sources.topic/200--registering-a-source.md",
+    "sha256": "e3fa7af005216e34264c0a0c537e1d8774bc96304b0548b28b080c06160fbf7c"
+  },
+  {
+    "source": "learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/500--registry-sources.topic/400--building-responses.md",
+    "archive": "docs/archive/documentation/learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/500--registry-sources.topic/400--building-responses.md",
+    "destination": "docs/learn/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/500--registry-sources.topic/400--building-responses.md",
+    "sha256": "e9a27c3026c0fbe4965676651d0be6fe508264848ed143d0c83c6c2bb0f09c19"
+  },
+  {
+    "source": "learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/500--registry-sources.topic/trail.toml",
+    "archive": "docs/archive/documentation/learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/500--registry-sources.topic/trail.toml",
+    "destination": "docs/learn/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/500--registry-sources.topic/trail.toml",
+    "sha256": "3bb9a73826b765b4bbb3ece67d85fbb19c7f409395fb867efdb4bcbbeebb1e81"
+  },
+  {
+    "source": "learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/500--registry-sources.topic/300--serving-requests.md",
+    "archive": "docs/archive/documentation/learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/500--registry-sources.topic/300--serving-requests.md",
+    "destination": "docs/learn/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/500--registry-sources.topic/300--serving-requests.md",
+    "sha256": "ea79ab666c51ad5e96fe00a029624e33a110f66a94d64bdcab04b5a6b20437fe"
+  },
+  {
+    "source": "learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/500--registry-sources.topic/100--overview.md",
+    "archive": "docs/archive/documentation/learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/500--registry-sources.topic/100--overview.md",
+    "destination": "docs/learn/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/500--registry-sources.topic/100--overview.md",
+    "sha256": "2d12ffa1104f6ac922585da579672f4291cfe1a03c0e923f84fef1b4b2bb20d7"
+  },
+  {
+    "source": "learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/400--sdk-events.topic/300--consuming-events.md",
+    "archive": "docs/archive/documentation/learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/400--sdk-events.topic/300--consuming-events.md",
+    "destination": "docs/learn/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/400--sdk-events.topic/300--consuming-events.md",
+    "sha256": "489658d102abc48f819b61836d38dee0dcee3fae11d58a20186d6d50f2b200a0"
+  },
+  {
+    "source": "learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/400--sdk-events.topic/200--emitting-events.md",
+    "archive": "docs/archive/documentation/learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/400--sdk-events.topic/200--emitting-events.md",
+    "destination": "docs/learn/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/400--sdk-events.topic/200--emitting-events.md",
+    "sha256": "54548c98dad5a5db171a58f147a579a2b1f5aa152f666d1069e6376588287d64"
+  },
+  {
+    "source": "learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/400--sdk-events.topic/trail.toml",
+    "archive": "docs/archive/documentation/learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/400--sdk-events.topic/trail.toml",
+    "destination": "docs/learn/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/400--sdk-events.topic/trail.toml",
+    "sha256": "324ae3224453fb6dd6bf494291444bd51a982ee106c15438955c0c97a8f88716"
+  },
+  {
+    "source": "learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/400--sdk-events.topic/100--overview.md",
+    "archive": "docs/archive/documentation/learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/400--sdk-events.topic/100--overview.md",
+    "destination": "docs/learn/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/400--sdk-events.topic/100--overview.md",
+    "sha256": "3ee23ce902c22bf395c6670cd95552cd22c6bd71205491ccb0910a4d35bd0354"
+  },
+  {
+    "source": "learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/300--sdk-registry.topic/300--watching-and-transactions.md",
+    "archive": "docs/archive/documentation/learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/300--sdk-registry.topic/300--watching-and-transactions.md",
+    "destination": "docs/learn/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/300--sdk-registry.topic/300--watching-and-transactions.md",
+    "sha256": "d38cc70c15e468fa354b8b59c63a43f115de34f551e0ba6a94ed4a034dca2713"
+  },
+  {
+    "source": "learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/300--sdk-registry.topic/200--reading-and-writing.md",
+    "archive": "docs/archive/documentation/learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/300--sdk-registry.topic/200--reading-and-writing.md",
+    "destination": "docs/learn/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/300--sdk-registry.topic/200--reading-and-writing.md",
+    "sha256": "861ae3e3b68d22acb99f3357e45e7d235baa560b73ee62fffbc66a27827287d1"
+  },
+  {
+    "source": "learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/300--sdk-registry.topic/trail.toml",
+    "archive": "docs/archive/documentation/learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/300--sdk-registry.topic/trail.toml",
+    "destination": "docs/learn/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/300--sdk-registry.topic/trail.toml",
+    "sha256": "3eb12cb9067d9e41cfee65b06f9a34887f5823bb69c88f74693dd98686da51f3"
+  },
+  {
+    "source": "learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/300--sdk-registry.topic/100--overview.md",
+    "archive": "docs/archive/documentation/learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/300--sdk-registry.topic/100--overview.md",
+    "destination": "docs/learn/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/300--sdk-registry.topic/100--overview.md",
+    "sha256": "318dcff88ccc0eb1a9ef993bc1b63f0e4e0bb448a95db5c4976d0d968c94267f"
+  },
+  {
+    "source": "learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/5--sdk-files/4--mount-policy.md",
+    "archive": "docs/archive/documentation/learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/5--sdk-files/4--mount-policy.md",
+    "destination": "docs/learn/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/5--sdk-files/4--mount-policy.md",
+    "sha256": "abcf88508c44539f6b192cec071998f328f164f370a5e3c3299939f203d34828"
+  },
+  {
+    "source": "learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/5--sdk-files/2--opening-a-file.md",
+    "archive": "docs/archive/documentation/learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/5--sdk-files/2--opening-a-file.md",
+    "destination": "docs/learn/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/5--sdk-files/2--opening-a-file.md",
+    "sha256": "ff7470ddea0718a3f6e4d115e80a2bb62339dc10d5ed7a3870a5295479f4d6cb"
+  },
+  {
+    "source": "learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/5--sdk-files/1--file-h-file-security.md",
+    "archive": "docs/archive/documentation/learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/5--sdk-files/1--file-h-file-security.md",
+    "destination": "docs/learn/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/5--sdk-files/1--file-h-file-security.md",
+    "sha256": "95e8f564b7dfde4c742822c22252b8bebe83922b9cad6f42cbd8b708ee5a78ab"
+  },
+  {
+    "source": "learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/5--sdk-files/3--reading-and-writing-a-file-s-security-descriptor.md",
+    "archive": "docs/archive/documentation/learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/5--sdk-files/3--reading-and-writing-a-file-s-security-descriptor.md",
+    "destination": "docs/learn/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/5--sdk-files/3--reading-and-writing-a-file-s-security-descriptor.md",
+    "sha256": "f9c08bc788f60dac668efab01ba3b260e86f26a7199b12049fce28819eeaf887"
+  },
+  {
+    "source": "learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/5--sdk-files/trail.toml",
+    "archive": "docs/archive/documentation/learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/5--sdk-files/trail.toml",
+    "destination": "docs/learn/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/5--sdk-files/trail.toml",
+    "sha256": "47a584b81d5b7a23ce32a90d0e19878d2e41e70a060376faca4ebe5c2df73f9b"
+  },
+  {
+    "source": "learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/5--sdk-files/5--the-generic-mapping.md",
+    "archive": "docs/archive/documentation/learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/5--sdk-files/5--the-generic-mapping.md",
+    "destination": "docs/learn/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/5--sdk-files/5--the-generic-mapping.md",
+    "sha256": "78b8b0d190cde886b4c762af9316e194b27d52ce6fe4e412b1a20e9109c5800c"
+  },
+  {
+    "source": "learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/4--sdk-access/3--the-check.md",
+    "archive": "docs/archive/documentation/learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/4--sdk-access/3--the-check.md",
+    "destination": "docs/learn/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/4--sdk-access/3--the-check.md",
+    "sha256": "cdaa72cb7daa6a5a336d2854b164038aa8aea2a19788b9c0f18d3eb18be38efb"
+  },
+  {
+    "source": "learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/4--sdk-access/5--the-object-type-list-variant.md",
+    "archive": "docs/archive/documentation/learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/4--sdk-access/5--the-object-type-list-variant.md",
+    "destination": "docs/learn/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/4--sdk-access/5--the-object-type-list-variant.md",
+    "sha256": "18227360d083b109df35a2b169261a50e45a6523dcc1a082e3d0186cfc8a76a0"
+  },
+  {
+    "source": "learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/4--sdk-access/6--the-audit-context.md",
+    "archive": "docs/archive/documentation/learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/4--sdk-access/6--the-audit-context.md",
+    "destination": "docs/learn/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/4--sdk-access/6--the-audit-context.md",
+    "sha256": "a3bd908fc24b82dde96e183ab86b0e57cc1944031d1015b3745b8ba4da4681e3",
+    "retained_sections": [
+      "learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/100--sdk-basics.topic/600--audit-context-bindings.md"
+    ]
+  },
+  {
+    "source": "learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/4--sdk-access/1--access-h-access-checks.md",
+    "archive": "docs/archive/documentation/learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/4--sdk-access/1--access-h-access-checks.md",
+    "destination": "docs/learn/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/4--sdk-access/1--access-h-access-checks.md",
+    "sha256": "faaee99a7393a9d5b16cca54e9070ced8f584948b0786135a497c4ee90f9dd01"
+  },
+  {
+    "source": "learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/4--sdk-access/trail.toml",
+    "archive": "docs/archive/documentation/learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/4--sdk-access/trail.toml",
+    "destination": "docs/learn/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/4--sdk-access/trail.toml",
+    "sha256": "a6c235f6caae8bd1c3fc1fddaa9f6a73830b612d4c8457e19137380022b44526"
+  },
+  {
+    "source": "learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/4--sdk-access/4--audit-outputs.md",
+    "archive": "docs/archive/documentation/learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/4--sdk-access/4--audit-outputs.md",
+    "destination": "docs/learn/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/4--sdk-access/4--audit-outputs.md",
+    "sha256": "ba98694470f194d3829ed6e4429a3afc5ed705e3b0a2a026b6c59de50162cfc6"
+  },
+  {
+    "source": "learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/4--sdk-access/2--the-request.md",
+    "archive": "docs/archive/documentation/learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/4--sdk-access/2--the-request.md",
+    "destination": "docs/learn/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/4--sdk-access/2--the-request.md",
+    "sha256": "8bab35a7f08f98ed7b08870b0286e7a79de469226ae1657adcdf1a1c45bd11e2"
+  },
+  {
+    "source": "learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/7--sdk-registry-api/3--opening-and-creating-keys.md",
+    "archive": "docs/archive/documentation/learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/7--sdk-registry-api/3--opening-and-creating-keys.md",
+    "destination": "docs/learn/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/7--sdk-registry-api/3--opening-and-creating-keys.md",
+    "sha256": "0bf95395c1eafd128b87ecf1b25c591b1756d970e046b046c403fd205e3e06a1"
+  },
+  {
+    "source": "learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/7--sdk-registry-api/5--subkeys-metadata-and-watches.md",
+    "archive": "docs/archive/documentation/learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/7--sdk-registry-api/5--subkeys-metadata-and-watches.md",
+    "destination": "docs/learn/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/7--sdk-registry-api/5--subkeys-metadata-and-watches.md",
+    "sha256": "7be3b6a9b6dc8560164be61a0858dca0d2002111cc1d7782dd33620aab8c011c"
+  },
+  {
+    "source": "learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/7--sdk-registry-api/2--the-buffer-convention-here.md",
+    "archive": "docs/archive/documentation/learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/7--sdk-registry-api/2--the-buffer-convention-here.md",
+    "destination": "docs/learn/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/7--sdk-registry-api/2--the-buffer-convention-here.md",
+    "sha256": "8235aff2600d4fa63f02315abafb7b695e11aee973eebd7c34d96845f00d0512"
+  },
+  {
+    "source": "learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/7--sdk-registry-api/1--registry-h-the-registry-lcs.md",
+    "archive": "docs/archive/documentation/learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/7--sdk-registry-api/1--registry-h-the-registry-lcs.md",
+    "destination": "docs/learn/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/7--sdk-registry-api/1--registry-h-the-registry-lcs.md",
+    "sha256": "f62f122b490366701bb15114e5f32941b4aa598173366a6b0f20f0368c2415af"
+  },
+  {
+    "source": "learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/7--sdk-registry-api/7--backup-and-restore.md",
+    "archive": "docs/archive/documentation/learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/7--sdk-registry-api/7--backup-and-restore.md",
+    "destination": "docs/learn/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/7--sdk-registry-api/7--backup-and-restore.md",
+    "sha256": "6dac05ac3adaf1c170115fa60fe41528a22a7abc277c9c6bf67953ad2e69b58a"
+  },
+  {
+    "source": "learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/7--sdk-registry-api/4--values.md",
+    "archive": "docs/archive/documentation/learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/7--sdk-registry-api/4--values.md",
+    "destination": "docs/learn/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/7--sdk-registry-api/4--values.md",
+    "sha256": "966ce4a684a8dc72b246238878f86a1f6d4edd4d499f0f4b93c78fc7410611ae"
+  },
+  {
+    "source": "learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/7--sdk-registry-api/8--transactions.md",
+    "archive": "docs/archive/documentation/learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/7--sdk-registry-api/8--transactions.md",
+    "destination": "docs/learn/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/7--sdk-registry-api/8--transactions.md",
+    "sha256": "0dd1ef69f78a2830ac3b4b854948a7bde60e455e10cb35c795a296fd24180410"
+  },
+  {
+    "source": "learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/7--sdk-registry-api/6--key-security-descriptors.md",
+    "archive": "docs/archive/documentation/learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/7--sdk-registry-api/6--key-security-descriptors.md",
+    "destination": "docs/learn/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/7--sdk-registry-api/6--key-security-descriptors.md",
+    "sha256": "6438dab8d8ed4d54731d2eee9d00545e298eefc77c1bebb680d4451a61d8e4f7"
+  },
+  {
+    "source": "learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/7--sdk-registry-api/trail.toml",
+    "archive": "docs/archive/documentation/learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/7--sdk-registry-api/trail.toml",
+    "destination": "docs/learn/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/7--sdk-registry-api/trail.toml",
+    "sha256": "270d98ab31900425ea38c5c7bee18b3c8730900b5bab2535485f67380d3403a6"
+  },
+  {
+    "source": "learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/6--sdk-processes/1--process-h.md",
+    "archive": "docs/archive/documentation/learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/6--sdk-processes/1--process-h.md",
+    "destination": "docs/learn/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/6--sdk-processes/1--process-h.md",
+    "sha256": "7d4f263e175a86cbf2d5e6c4159abd5a45738598e4ed3f858c0d29b60d47834f"
+  },
+  {
+    "source": "learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/6--sdk-processes/trail.toml",
+    "archive": "docs/archive/documentation/learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/6--sdk-processes/trail.toml",
+    "destination": "docs/learn/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/6--sdk-processes/trail.toml",
+    "sha256": "c0eacdcaf9b6a2b1c8ab0e37ff26acd78029ec6eb2b24fb31e544fb1ba33db0b"
+  },
+  {
+    "source": "learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/1--sdk-conventions/5--file-descriptors.md",
+    "archive": "docs/archive/documentation/learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/1--sdk-conventions/5--file-descriptors.md",
+    "destination": "docs/learn/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/1--sdk-conventions/5--file-descriptors.md",
+    "sha256": "3df3c79ee3767a52c2471ab0b855e18d4474c5e83efb34e135a4e8c9c68e09a4"
+  },
+  {
+    "source": "learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/1--sdk-conventions/7--the-conventions-at-a-glance.md",
+    "archive": "docs/archive/documentation/learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/1--sdk-conventions/7--the-conventions-at-a-glance.md",
+    "destination": "docs/learn/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/1--sdk-conventions/7--the-conventions-at-a-glance.md",
+    "sha256": "d824dbdfb40c5bddf035c2aad1add6d6f60f45435e64a052b0612d3947107d54"
+  },
+  {
+    "source": "learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/1--sdk-conventions/6--constants.md",
+    "archive": "docs/archive/documentation/learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/1--sdk-conventions/6--constants.md",
+    "destination": "docs/learn/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/1--sdk-conventions/6--constants.md",
+    "sha256": "647600efac329b98e053dca7a12f53925f56289ccfac8041add314ef5eba9fcd"
+  },
+  {
+    "source": "learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/1--sdk-conventions/3--the-two-call-buffer-protocol.md",
+    "archive": "docs/archive/documentation/learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/1--sdk-conventions/3--the-two-call-buffer-protocol.md",
+    "destination": "docs/learn/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/1--sdk-conventions/3--the-two-call-buffer-protocol.md",
+    "sha256": "77388734a8e4a3360143deb0081d40a1d84f6bcb2aba13499c0830163a07e9b6"
+  },
+  {
+    "source": "learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/1--sdk-conventions/2--how-results-are-returned.md",
+    "archive": "docs/archive/documentation/learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/1--sdk-conventions/2--how-results-are-returned.md",
+    "destination": "docs/learn/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/1--sdk-conventions/2--how-results-are-returned.md",
+    "sha256": "2363c5438f61e78182607ef67f32b09fe9a56e2e953e4c3f96095bd2b75756a4"
+  },
+  {
+    "source": "learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/1--sdk-conventions/4--memory-ownership.md",
+    "archive": "docs/archive/documentation/learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/1--sdk-conventions/4--memory-ownership.md",
+    "destination": "docs/learn/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/1--sdk-conventions/4--memory-ownership.md",
+    "sha256": "b6c01fab0239925e9a2091004cbba5d04349d6e65c0938cb65deeda847ad5294"
+  },
+  {
+    "source": "learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/1--sdk-conventions/1--library-conventions.md",
+    "archive": "docs/archive/documentation/learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/1--sdk-conventions/1--library-conventions.md",
+    "destination": "docs/learn/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/1--sdk-conventions/1--library-conventions.md",
+    "sha256": "59486a3b0e60272d1640ac4e8a48d5dd82501e2749ebb8fd4f5f9fa375199443"
+  },
+  {
+    "source": "learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/1--sdk-conventions/trail.toml",
+    "archive": "docs/archive/documentation/learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/1--sdk-conventions/trail.toml",
+    "destination": "docs/learn/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/1--sdk-conventions/trail.toml",
+    "sha256": "f6f39e38e87c92405a8e648290db84fae473886212ea98eca00411ada6b36869"
+  },
+  {
+    "source": "learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/12--sdk-rsi-response/3--the-response-contract.md",
+    "archive": "docs/archive/documentation/learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/12--sdk-rsi-response/3--the-response-contract.md",
+    "destination": "docs/learn/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/12--sdk-rsi-response/3--the-response-contract.md",
+    "sha256": "2209c563bd59f22166e855065ee034f0b9e4a566ddb4b62f084f5e97cfb7b262"
+  },
+  {
+    "source": "learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/12--sdk-rsi-response/6--payload-bearing-responses.md",
+    "archive": "docs/archive/documentation/learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/12--sdk-rsi-response/6--payload-bearing-responses.md",
+    "destination": "docs/learn/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/12--sdk-rsi-response/6--payload-bearing-responses.md",
+    "sha256": "f7f650e0b926327cc9319875e0374d26916f2b92784df59022fb7e566a899283"
+  },
+  {
+    "source": "learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/12--sdk-rsi-response/2--status-codes.md",
+    "archive": "docs/archive/documentation/learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/12--sdk-rsi-response/2--status-codes.md",
+    "destination": "docs/learn/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/12--sdk-rsi-response/2--status-codes.md",
+    "sha256": "c1048e6012361b60fd3fdcd908b19f99438b9669d71197e8335e16482d29df54"
+  },
+  {
+    "source": "learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/12--sdk-rsi-response/trail.toml",
+    "archive": "docs/archive/documentation/learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/12--sdk-rsi-response/trail.toml",
+    "destination": "docs/learn/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/12--sdk-rsi-response/trail.toml",
+    "sha256": "49645cfe7a999557e79795d2f8be8dcecd41322573b2094cee17fd4755ae9986"
+  },
+  {
+    "source": "learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/12--sdk-rsi-response/5--status-only-responses.md",
+    "archive": "docs/archive/documentation/learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/12--sdk-rsi-response/5--status-only-responses.md",
+    "destination": "docs/learn/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/12--sdk-rsi-response/5--status-only-responses.md",
+    "sha256": "f72949d37de9dfc1d68b4ed92de6d7c193e6ae7025c0d88a50c6a458940f4b88"
+  },
+  {
+    "source": "learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/12--sdk-rsi-response/1--rsi-response-h-building-responses.md",
+    "archive": "docs/archive/documentation/learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/12--sdk-rsi-response/1--rsi-response-h-building-responses.md",
+    "destination": "docs/learn/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/12--sdk-rsi-response/1--rsi-response-h-building-responses.md",
+    "sha256": "54e34bf22d4360dd41f5d75772e5dd22471f950d8be15f212b1ad234cf4b473a"
+  },
+  {
+    "source": "learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/12--sdk-rsi-response/4--sending-a-pre-built-frame.md",
+    "archive": "docs/archive/documentation/learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/12--sdk-rsi-response/4--sending-a-pre-built-frame.md",
+    "destination": "docs/learn/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/12--sdk-rsi-response/4--sending-a-pre-built-frame.md",
+    "sha256": "dad4b1a6ce89fed88aa4df70dd7dc26c8947f5fc045ce6626c84f0dfef99c6fe"
+  },
+  {
+    "source": "learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/12--sdk-rsi-response/7--the-five-at-a-glance.md",
+    "archive": "docs/archive/documentation/learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/12--sdk-rsi-response/7--the-five-at-a-glance.md",
+    "destination": "docs/learn/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/12--sdk-rsi-response/7--the-five-at-a-glance.md",
+    "sha256": "2f7fdac748678bb0fa9bd717a7ef92339cdfbe61e49f9af7939bcd408fe9679a"
+  },
+  {
+    "source": "learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/11--sdk-rsi-request/3--the-decoders.md",
+    "archive": "docs/archive/documentation/learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/11--sdk-rsi-request/3--the-decoders.md",
+    "destination": "docs/learn/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/11--sdk-rsi-request/3--the-decoders.md",
+    "sha256": "38afa99dd146e9e657e3ea701dd4244e27c294669aa661572b28aa5909d34a78"
+  },
+  {
+    "source": "learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/11--sdk-rsi-request/1--rsi-request-h-decoding-requests.md",
+    "archive": "docs/archive/documentation/learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/11--sdk-rsi-request/1--rsi-request-h-decoding-requests.md",
+    "destination": "docs/learn/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/11--sdk-rsi-request/1--rsi-request-h-decoding-requests.md",
+    "sha256": "d304f02a0da5e0659a17d3df12d2b08d35cc423a491d9f01d2d448986e049a4d"
+  },
+  {
+    "source": "learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/11--sdk-rsi-request/trail.toml",
+    "archive": "docs/archive/documentation/learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/11--sdk-rsi-request/trail.toml",
+    "destination": "docs/learn/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/11--sdk-rsi-request/trail.toml",
+    "sha256": "35b87bba2e0da0f5ff5757fe7c122d0322fa0b3d165f729cf827572a17e4e2a2"
+  },
+  {
+    "source": "learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/11--sdk-rsi-request/2--reading-and-parsing-a-frame.md",
+    "archive": "docs/archive/documentation/learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/11--sdk-rsi-request/2--reading-and-parsing-a-frame.md",
+    "destination": "docs/learn/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/11--sdk-rsi-request/2--reading-and-parsing-a-frame.md",
+    "sha256": "01dc6f3e7098e5971d8051011a31d1d9d07f9c7e55e8ba461bb67ef3dea5ac6e"
+  },
+  {
+    "source": "learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/9--sdk-msgpack/1--msgpack-h-messagepack-codec.md",
+    "archive": "docs/archive/documentation/learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/9--sdk-msgpack/1--msgpack-h-messagepack-codec.md",
+    "destination": "docs/learn/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/9--sdk-msgpack/1--msgpack-h-messagepack-codec.md",
+    "sha256": "be7abd3134bc951b992c390e8e9f76f69e8b31f4ba1e54fe2a3a985b4cc760a8"
+  },
+  {
+    "source": "learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/9--sdk-msgpack/2--conventions.md",
+    "archive": "docs/archive/documentation/learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/9--sdk-msgpack/2--conventions.md",
+    "destination": "docs/learn/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/9--sdk-msgpack/2--conventions.md",
+    "sha256": "df3563754199d5846f223313416d6a312eec6f4c7eae2e3badd499e3607a9fe0"
+  },
+  {
+    "source": "learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/9--sdk-msgpack/5--validator.md",
+    "archive": "docs/archive/documentation/learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/9--sdk-msgpack/5--validator.md",
+    "destination": "docs/learn/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/9--sdk-msgpack/5--validator.md",
+    "sha256": "13719bf9b87ed2f7ce4e49ce60f6d86a475a624595532c1a4bd376eeedb103a9"
+  },
+  {
+    "source": "learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/9--sdk-msgpack/3--writer.md",
+    "archive": "docs/archive/documentation/learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/9--sdk-msgpack/3--writer.md",
+    "destination": "docs/learn/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/9--sdk-msgpack/3--writer.md",
+    "sha256": "71342ef21c8dda4cfb2a357f44bb739143f2288436f5e2d91d1fe3459e57d191"
+  },
+  {
+    "source": "learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/9--sdk-msgpack/4--reader.md",
+    "archive": "docs/archive/documentation/learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/9--sdk-msgpack/4--reader.md",
+    "destination": "docs/learn/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/9--sdk-msgpack/4--reader.md",
+    "sha256": "8a573e59e9b20cb154e4fde4bfe36e6a0c58255a1853edb3629efcf986d6244d"
+  },
+  {
+    "source": "learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/9--sdk-msgpack/trail.toml",
+    "archive": "docs/archive/documentation/learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/9--sdk-msgpack/trail.toml",
+    "destination": "docs/learn/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/9--sdk-msgpack/trail.toml",
+    "sha256": "fc26c84a1d5b86922a848b042f1d5e7a937ee7a4901b26e1420a0ecc887d74ea"
+  },
+  {
+    "source": "learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/3--sdk-tokens/1--token-h-tokens-and-sessions.md",
+    "archive": "docs/archive/documentation/learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/3--sdk-tokens/1--token-h-tokens-and-sessions.md",
+    "destination": "docs/learn/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/3--sdk-tokens/1--token-h-tokens-and-sessions.md",
+    "sha256": "d49f460318d8361c163e6a7e5bc2cfacc29e3225119c2304db7904283170b811"
+  },
+  {
+    "source": "learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/3--sdk-tokens/7--the-generic-mapping.md",
+    "archive": "docs/archive/documentation/learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/3--sdk-tokens/7--the-generic-mapping.md",
+    "destination": "docs/learn/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/3--sdk-tokens/7--the-generic-mapping.md",
+    "sha256": "b1fcd28a76f791dd77794581c8cd20baef1a4d998e716bd7aceaacf524bf93d0"
+  },
+  {
+    "source": "learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/3--sdk-tokens/6--logon-sessions.md",
+    "archive": "docs/archive/documentation/learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/3--sdk-tokens/6--logon-sessions.md",
+    "destination": "docs/learn/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/3--sdk-tokens/6--logon-sessions.md",
+    "sha256": "3e7ba38f6c1e02c98f37d05c4b580fb0aba68b4382c7906a7e57d0d32a2bf36c"
+  },
+  {
+    "source": "learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/3--sdk-tokens/3--the-token-spec-builder.md",
+    "archive": "docs/archive/documentation/learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/3--sdk-tokens/3--the-token-spec-builder.md",
+    "destination": "docs/learn/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/3--sdk-tokens/3--the-token-spec-builder.md",
+    "sha256": "00624aae0c5151f2b361f45ad43d2f28bfd85df60a302f94360f5f4db708a5f3"
+  },
+  {
+    "source": "learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/3--sdk-tokens/2--opening-and-creating-tokens.md",
+    "archive": "docs/archive/documentation/learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/3--sdk-tokens/2--opening-and-creating-tokens.md",
+    "destination": "docs/learn/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/3--sdk-tokens/2--opening-and-creating-tokens.md",
+    "sha256": "70cfdecefa9ea0aef6637d2b7812debd16eb8789641bad60ac857e3319a7497c"
+  },
+  {
+    "source": "learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/3--sdk-tokens/trail.toml",
+    "archive": "docs/archive/documentation/learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/3--sdk-tokens/trail.toml",
+    "destination": "docs/learn/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/3--sdk-tokens/trail.toml",
+    "sha256": "522c7870cc25d2fc537840256b34eb3f259370ae4771fa29bf6d43e85d631b9b"
+  },
+  {
+    "source": "learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/3--sdk-tokens/4--query.md",
+    "archive": "docs/archive/documentation/learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/3--sdk-tokens/4--query.md",
+    "destination": "docs/learn/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/3--sdk-tokens/4--query.md",
+    "sha256": "50f734c6102908c18010f659a1415432dba39a91d55b3ef625433712644b2d6d"
+  },
+  {
+    "source": "learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/3--sdk-tokens/5--adjust-and-transform.md",
+    "archive": "docs/archive/documentation/learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/3--sdk-tokens/5--adjust-and-transform.md",
+    "destination": "docs/learn/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/3--sdk-tokens/5--adjust-and-transform.md",
+    "sha256": "d34e3ce9e6c924273905e74a8167aa04aacbf50dc484020bbac9605c63ca4b07"
+  },
+  {
+    "source": "learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/2--sdk-security/1--security-h-security-descriptors.md",
+    "archive": "docs/archive/documentation/learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/2--sdk-security/1--security-h-security-descriptors.md",
+    "destination": "docs/learn/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/2--sdk-security/1--security-h-security-descriptors.md",
+    "sha256": "36feee9f3b66d72805d512507fe22877f6cc383c00f2fb6f6fea3fadc03a9b56"
+  },
+  {
+    "source": "learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/2--sdk-security/8--sd-inheritance.md",
+    "archive": "docs/archive/documentation/learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/2--sdk-security/8--sd-inheritance.md",
+    "destination": "docs/learn/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/2--sdk-security/8--sd-inheritance.md",
+    "sha256": "161c828de569ae0100ecc47dbb5341da51eebd212bf72136d3a5c5a4435554a0"
+  },
+  {
+    "source": "learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/2--sdk-security/2--sids.md",
+    "archive": "docs/archive/documentation/learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/2--sdk-security/2--sids.md",
+    "destination": "docs/learn/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/2--sdk-security/2--sids.md",
+    "sha256": "f7788a24d3f14d2cb408f45cb50e10d44652bed6c49245f170c295977e7f9738"
+  },
+  {
+    "source": "learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/2--sdk-security/3--access-masks.md",
+    "archive": "docs/archive/documentation/learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/2--sdk-security/3--access-masks.md",
+    "destination": "docs/learn/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/2--sdk-security/3--access-masks.md",
+    "sha256": "eacf2351daf5d09dfb8768cc3ab86ec878643ec1d271f175699f48bcea247fa9"
+  },
+  {
+    "source": "learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/2--sdk-security/5--building-security-descriptors.md",
+    "archive": "docs/archive/documentation/learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/2--sdk-security/5--building-security-descriptors.md",
+    "destination": "docs/learn/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/2--sdk-security/5--building-security-descriptors.md",
+    "sha256": "d0442db9ad1dfc8cb456eea629771b2948f0d8b55b9ac1c4a70a905405068eee"
+  },
+  {
+    "source": "learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/2--sdk-security/4--building-acls.md",
+    "archive": "docs/archive/documentation/learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/2--sdk-security/4--building-acls.md",
+    "destination": "docs/learn/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/2--sdk-security/4--building-acls.md",
+    "sha256": "d76a1d51bc2dd237c6c1cc4a685f4e6515e9f00c7c50af7a48fa3ae963b49caa"
+  },
+  {
+    "source": "learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/2--sdk-security/6--parsing-views.md",
+    "archive": "docs/archive/documentation/learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/2--sdk-security/6--parsing-views.md",
+    "destination": "docs/learn/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/2--sdk-security/6--parsing-views.md",
+    "sha256": "5bb222d153452ca812464bc32d1cec23d9f840cea4b82cbadb1fdf3be7f041c6"
+  },
+  {
+    "source": "learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/2--sdk-security/trail.toml",
+    "archive": "docs/archive/documentation/learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/2--sdk-security/trail.toml",
+    "destination": "docs/learn/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/2--sdk-security/trail.toml",
+    "sha256": "0bbc63f419a0b128fdd49fbdfb93f6168e39899e1c85326db07795a465964d68"
+  },
+  {
+    "source": "learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/2--sdk-security/7--sddl-text-codec.md",
+    "archive": "docs/archive/documentation/learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/2--sdk-security/7--sddl-text-codec.md",
+    "destination": "docs/learn/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/2--sdk-security/7--sddl-text-codec.md",
+    "sha256": "a1fe3a9a4357dd055418df3bb95ab861ac2c66bcb4398fb90956faa688db679e"
+  },
+  {
+    "source": "learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/10--sdk-rsi-source/3--registering.md",
+    "archive": "docs/archive/documentation/learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/10--sdk-rsi-source/3--registering.md",
+    "destination": "docs/learn/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/10--sdk-rsi-source/3--registering.md",
+    "sha256": "84d419b43436701cd8afb784e3482a39d339caa3a60f521a46c83cf6c8ae1544"
+  },
+  {
+    "source": "learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/10--sdk-rsi-source/trail.toml",
+    "archive": "docs/archive/documentation/learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/10--sdk-rsi-source/trail.toml",
+    "destination": "docs/learn/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/10--sdk-rsi-source/trail.toml",
+    "sha256": "82643b0a419c78acd6e0ed8ce3296f2f08c39e83f22a4c040e3f8b301e5d873c"
+  },
+  {
+    "source": "learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/10--sdk-rsi-source/2--describing-a-hive.md",
+    "archive": "docs/archive/documentation/learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/10--sdk-rsi-source/2--describing-a-hive.md",
+    "destination": "docs/learn/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/10--sdk-rsi-source/2--describing-a-hive.md",
+    "sha256": "eeea71da7e478f5e3390983a5b241bc8fe9b1ace57fec1ed36b435353195949a"
+  },
+  {
+    "source": "learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/10--sdk-rsi-source/1--rsi-source-h-becoming-a-source.md",
+    "archive": "docs/archive/documentation/learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/10--sdk-rsi-source/1--rsi-source-h-becoming-a-source.md",
+    "destination": "docs/learn/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/10--sdk-rsi-source/1--rsi-source-h-becoming-a-source.md",
+    "sha256": "ba34f1e2eaf86b55d1db0bbb797517047f2ef8a035c8ef2a7be2d6c8b265bb68"
+  },
+  {
+    "source": "learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/10--sdk-rsi-source/4--what-comes-next.md",
+    "archive": "docs/archive/documentation/learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/10--sdk-rsi-source/4--what-comes-next.md",
+    "destination": "docs/learn/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/10--sdk-rsi-source/4--what-comes-next.md",
+    "sha256": "b098f94f972a3c6ff2f4cdc5402f34130a2f22be82c95c6a1383a5de8a87cc1b"
+  },
+  {
+    "source": "learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/8--sdk-events-api/1--event-h-events-kmes.md",
+    "archive": "docs/archive/documentation/learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/8--sdk-events-api/1--event-h-events-kmes.md",
+    "destination": "docs/learn/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/8--sdk-events-api/1--event-h-events-kmes.md",
+    "sha256": "a1dc780a4c74313035d3f71737416d768f3c73ea899d77e02345f51307cd57eb"
+  },
+  {
+    "source": "learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/8--sdk-events-api/2--emitting-events.md",
+    "archive": "docs/archive/documentation/learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/8--sdk-events-api/2--emitting-events.md",
+    "destination": "docs/learn/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/8--sdk-events-api/2--emitting-events.md",
+    "sha256": "961a0fa46c0459affc1d83d7986ca74552af2ed3949ac36b28b96dede43ddbc7"
+  },
+  {
+    "source": "learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/8--sdk-events-api/3--consuming-events.md",
+    "archive": "docs/archive/documentation/learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/8--sdk-events-api/3--consuming-events.md",
+    "destination": "docs/learn/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/8--sdk-events-api/3--consuming-events.md",
+    "sha256": "6546bd56ac85c2cb8636391aac0f582adf7fe3baa29ec962f4337aeb3d8b2851"
+  },
+  {
+    "source": "learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/8--sdk-events-api/trail.toml",
+    "archive": "docs/archive/documentation/learn-staging/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/8--sdk-events-api/trail.toml",
+    "destination": "docs/learn/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/600--sdk-reference.book/8--sdk-events-api/trail.toml",
+    "sha256": "bf1a14b0275250d1ae988fcf2cf686297086e3b6dadc8577b34962e3a1eb3d67"
+  }
+]
