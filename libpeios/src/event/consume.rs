@@ -393,7 +393,7 @@ unsafe fn futex_wait(addr: *const u32, expected: u32, timeout_ms: c_int) -> c_in
         core::ptr::null::<libc::timespec>()
     } else {
         ts = libc::timespec {
-            tv_sec: (timeout_ms / 1000) as libc::time_t,
+            tv_sec: (timeout_ms / 1000) as _,
             tv_nsec: ((timeout_ms % 1000) * 1_000_000) as _,
         };
         &ts as *const libc::timespec

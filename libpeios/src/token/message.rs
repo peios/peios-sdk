@@ -81,14 +81,18 @@ const fn cmsg_len(len: usize) -> usize {
 
 /// Append one control message to `buf`, which must have been sized with
 /// [`cmsg_space`] for everything it will hold.
+#[allow(clippy::unnecessary_cast)] // libc field widths differ between GNU and musl.
 fn push_cmsg(buf: &mut Vec<u8>, level: c_int, kind: c_int, data: &[u8]) {
     let start = buf.len();
     buf.resize(start + cmsg_space(data.len()), 0);
-    let header = libc::cmsghdr {
-        cmsg_len: cmsg_len(data.len()),
-        cmsg_level: level,
-        cmsg_type: kind,
-    };
+    // SAFETY: cmsghdr contains integer fields; zero also initializes musl's
+    // explicit padding before the complete header is copied as wire bytes.
+    let mut header: libc::cmsghdr = unsafe { core::mem::zeroed() };
+    // Public entry points bound descriptors to SCM_MAX_FD, so this length
+    // fits musl's u32 field as well as GNU libc's usize field.
+    header.cmsg_len = cmsg_len(data.len()) as _;
+    header.cmsg_level = level;
+    header.cmsg_type = kind;
     // SAFETY: `buf` has room for the header at `start`; a byte copy of a
     // `repr(C)` header with no padding-sensitive fields.
     unsafe {
@@ -133,6 +137,7 @@ struct ParsedCmsg<'a> {
 
 /// Walk a received control buffer of `len` valid bytes, yielding each
 /// well-formed message and stopping at the first malformed one. Pure.
+#[allow(clippy::unnecessary_cast)] // libc field widths differ between GNU and musl.
 fn parse_control(buf: &[u8]) -> impl Iterator<Item = ParsedCmsg<'_>> {
     let header_len = size_of::<libc::cmsghdr>();
     let mut offset = 0usize;
@@ -144,7 +149,7 @@ fn parse_control(buf: &[u8]) -> impl Iterator<Item = ParsedCmsg<'_>> {
         // plain-old-data header.
         let header: libc::cmsghdr =
             unsafe { core::ptr::read_unaligned(buf.as_ptr().add(offset) as *const libc::cmsghdr) };
-        let cmsg_len = header.cmsg_len;
+        let cmsg_len = header.cmsg_len as usize;
         if cmsg_len < header_len || offset + cmsg_len > buf.len() {
             return None;
         }
@@ -218,6 +223,7 @@ unsafe fn deliver_control(buf: &[u8], msg: &mut peios_socket_message) {
 /// `buf` must be readable for `len` bytes and `fds` for `fd_count` aligned descriptors when their
 /// lengths are nonzero. All supplied descriptors must remain open until the call returns.
 #[no_mangle]
+#[allow(clippy::unnecessary_cast)] // libc field widths differ between GNU and musl.
 pub unsafe extern "C" fn peios_socket_send_message(
     sock_fd: c_int,
     buf: *const c_void,
@@ -250,7 +256,7 @@ pub unsafe extern "C" fn peios_socket_send_message(
     hdr.msg_iovlen = 1;
     if !control.is_empty() {
         hdr.msg_control = control.as_ptr() as *mut c_void;
-        hdr.msg_controllen = control.len();
+        hdr.msg_controllen = control.len() as _;
     }
     let r = syscall3(
         libc::SYS_sendmsg as u32,
@@ -280,6 +286,7 @@ pub unsafe extern "C" fn peios_socket_send_message(
 /// exclusively writable, and its `fds` array writable for `fd_cap` descriptors. The caller owns
 /// and must close every descriptor returned on success.
 #[no_mangle]
+#[allow(clippy::unnecessary_cast)] // libc field widths differ between GNU and musl.
 pub unsafe extern "C" fn peios_socket_recv_message(
     sock_fd: c_int,
     buf: *mut c_void,
@@ -318,7 +325,7 @@ pub unsafe extern "C" fn peios_socket_recv_message(
     hdr.msg_iov = &mut iov;
     hdr.msg_iovlen = 1;
     hdr.msg_control = control.as_mut_ptr() as *mut c_void;
-    hdr.msg_controllen = control_len;
+    hdr.msg_controllen = control_len as _;
     let r = syscall3(
         libc::SYS_recvmsg as u32,
         sock_fd as c_long,
@@ -328,7 +335,7 @@ pub unsafe extern "C" fn peios_socket_recv_message(
     if r < 0 {
         return -1;
     }
-    let delivered = hdr.msg_controllen.min(control_len);
+    let delivered = (hdr.msg_controllen as usize).min(control_len);
     // SAFETY: the advertised prefix was initialised above and `delivered` is
     // capped to that prefix.
     let delivered_control =

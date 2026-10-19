@@ -88,6 +88,18 @@ The `//:static-runtime-test` check links both archives into Rust executables
 with unwind and abort panic strategies and exercises userspace parsing.
 It does not invoke Peios kernel operations.
 
+For a self-contained musl executable, build a matching archive instead of
+reusing the GNU-libc archive:
+
+```sh
+./bazel build --config=musl //libpeios:static
+```
+
+In a compatible Peios build environment, combine `--config=peios` and
+`--config=musl` to use the installed hardened musl standard library. This
+configuration supports the static archive needed by early-boot consumers;
+it does not define a separate musl SDK package family.
+
 ## Static debugging
 
 Packaged static archives have DWARF information removed while retaining

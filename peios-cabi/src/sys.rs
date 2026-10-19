@@ -18,6 +18,11 @@ use core::ffi::{c_int, c_long, c_ulong, c_void};
 /// pointed-to buffer's layout, access, lifetime, and synchronization requirements.
 #[inline]
 pub unsafe fn ioctl(fd: c_int, request: c_ulong, arg: *mut c_void) -> c_int {
+    // musl declares the request as int; GNU libc uses unsigned long. Linux
+    // ioctl command numbers carry 32 bits, including the direction bits.
+    // Preserve that bit pattern rather than treating its high bit as overflow.
+    #[cfg(target_env = "musl")]
+    let request = request as c_int;
     libc::ioctl(fd, request, arg)
 }
 
