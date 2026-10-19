@@ -130,6 +130,8 @@ impl core::fmt::Write for StackWriter {
 
 /// Fallibly heap-allocate `value` and leak it as a raw pointer, returning NULL on
 /// allocation failure (the `*_builder_new()` contract). Pairs with [`raw_free`].
+/// Zero-sized values need no allocation, but the returned aligned pointer still
+/// owns the value: its destructor runs when the pointer is passed to [`raw_free`].
 ///
 /// # Safety
 /// The returned pointer, if non-null, owns `value` and must be released exactly
@@ -137,6 +139,8 @@ impl core::fmt::Write for StackWriter {
 pub unsafe fn raw_new<T>(value: T) -> *mut T {
     let layout = Layout::new::<T>();
     if layout.size() == 0 {
+        // Transfer ownership to the aligned pointer; raw_free runs the destructor.
+        core::mem::forget(value);
         return core::ptr::NonNull::<T>::dangling().as_ptr();
     }
     let raw = alloc::alloc::alloc(layout) as *mut T;
@@ -209,8 +213,52 @@ pub unsafe fn cstr_bytes<'a>(ptr: *const c_char, max: usize) -> Option<&'a [u8]>
 
 #[cfg(test)]
 mod tests {
+    use core::sync::atomic::{AtomicUsize, Ordering};
+
     use super::*;
     use crate::error::{get_errno, set_errno};
+
+    #[test]
+    fn raw_new_transfers_zero_sized_value_until_free() {
+        static DROPS: AtomicUsize = AtomicUsize::new(0);
+        struct Value;
+        impl Drop for Value {
+            fn drop(&mut self) {
+                DROPS.fetch_add(1, Ordering::Relaxed);
+            }
+        }
+
+        assert_eq!(size_of::<Value>(), 0);
+        let raw = unsafe { raw_new(Value) };
+        assert!(!raw.is_null());
+        assert_eq!(DROPS.load(Ordering::Relaxed), 0);
+        // This is the only release of the value transferred into raw_new.
+        unsafe { raw_free(raw) };
+        assert_eq!(DROPS.load(Ordering::Relaxed), 1);
+        unsafe { raw_free::<Value>(core::ptr::null_mut()) };
+        assert_eq!(DROPS.load(Ordering::Relaxed), 1);
+    }
+
+    #[test]
+    fn raw_new_preserves_alignment_for_zero_sized_value() {
+        static DROPS: AtomicUsize = AtomicUsize::new(0);
+        #[repr(align(4096))]
+        struct Value;
+        impl Drop for Value {
+            fn drop(&mut self) {
+                DROPS.fetch_add(1, Ordering::Relaxed);
+            }
+        }
+
+        assert_eq!(size_of::<Value>(), 0);
+        let raw = unsafe { raw_new(Value) };
+        assert!(!raw.is_null());
+        assert!(raw.is_aligned());
+        assert_eq!(DROPS.load(Ordering::Relaxed), 0);
+        // The aligned pointer owns this zero-sized value even without an allocation.
+        unsafe { raw_free(raw) };
+        assert_eq!(DROPS.load(Ordering::Relaxed), 1);
+    }
 
     // ---- emit_bytes: the getxattr probe / EINVAL / ERANGE / copy contract ----
 

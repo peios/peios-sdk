@@ -52,6 +52,12 @@ Library-created builders are destroyed through the matching library
 function. Registry source decoders borrow their incoming frame; reusing
 that frame invalidates the decoded views.
 
+The internal `raw_new` helper transfers ownership to its returned pointer.
+Release each successful result exactly once with `raw_free`, including for
+zero-sized Rust values. Those values need no allocation, but their
+destructor must still run once at release. The pointer retains the type's
+alignment even when the type occupies no bytes.
+
 The no-standard-library production crates still allocate through the C
 allocator where their interfaces need owned buffers. That arrangement does
 not make unchecked pointers safe. Every exported function's pointer,
