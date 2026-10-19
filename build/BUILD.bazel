@@ -1,0 +1,41 @@
+load(":checks.bzl", "rust_toolchain_inputs")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files([
+    "BUILD.bazel",
+    "rules-rust-system-libraries.patch",
+])
+
+config_setting(
+    name = "native",
+    values = {"define": "peios_native=true"},
+)
+
+constraint_setting(
+    name = "libc",
+    default_constraint_value = ":libc-gnu",
+)
+
+constraint_value(
+    name = "libc-gnu",
+    constraint_setting = ":libc",
+)
+
+filegroup(
+    name = "sources",
+    srcs = glob(
+        ["**"],
+        exclude = [
+            "**/__pycache__/**",
+            "**/*.pyc",
+        ],
+    ),
+)
+
+rust_toolchain_inputs(name = "toolchain-inputs")
+
+filegroup(
+    name = "build-files",
+    srcs = ["BUILD.bazel"] + glob(["*.bzl"]),
+)

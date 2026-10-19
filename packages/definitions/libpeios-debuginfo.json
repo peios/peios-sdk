@@ -1,0 +1,19 @@
+{
+    "package": {
+        "name": "dev.peios.libpeios-debuginfo",
+        "version": "0.5.11-1",
+        "architecture": "x86_64",
+        "license": "(Apache-2.0 OR MIT) AND MIT",
+        "license_class": "free",
+        "homepage": "https://github.com/peios/libpeios",
+        "description": "Split debugging information for libpeios"
+    },
+    "dependencies": {
+        "dev.peios.libpeios": "= 0.5.11-1"
+    },
+    "files": {
+        "source:libpeios/LICENSE": "usr/share/licenses/dev.peios.libpeios-debuginfo/LICENSE",
+        "stage:licenses/libpeios/**": "usr/share/licenses/dev.peios.libpeios-debuginfo/third-party",
+        "stage:debug/libpeios/usr/lib/debug/**": "usr/lib/debug"
+    }
+}

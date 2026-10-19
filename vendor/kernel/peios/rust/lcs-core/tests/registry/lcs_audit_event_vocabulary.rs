@@ -1,0 +1,171 @@
+use lcs_core::{
+    LCS_CONFIG_ROOT_PATH, LcsAuditEmissionFailurePolicy, LcsAuditEventKind, LcsLimits,
+    LcsSelfConfigInvalidAuditRecord, LcsSelfConfigReceivedValue, REG_DWORD, REG_SZ,
+    REQUEST_TIMEOUT_MS, lcs_audit_emission_failure_policy, plan_self_config_invalid_audit_record,
+};
+
+#[test]
+fn lcs_audit_event_names_match_the_event_catalogue() {
+    assert_eq!(
+        LcsAuditEventKind::KeyOpenAudit.event_type(),
+        "lcs.audit.key.opened"
+    );
+    assert_eq!(
+        LcsAuditEventKind::BackupStart.event_type(),
+        "lcs.audit.backup.started"
+    );
+    assert_eq!(
+        LcsAuditEventKind::BackupComplete.event_type(),
+        "lcs.audit.backup.ended"
+    );
+    assert_eq!(
+        LcsAuditEventKind::RestoreStart.event_type(),
+        "lcs.audit.restore.started"
+    );
+    assert_eq!(
+        LcsAuditEventKind::RestoreComplete.event_type(),
+        "lcs.audit.restore.ended"
+    );
+    assert_eq!(
+        LcsAuditEventKind::SourceValidationFailure.event_type(),
+        "lcs.source.response.rejected"
+    );
+    assert_eq!(
+        LcsAuditEventKind::SelfConfigInvalid.event_type(),
+        "lcs.config.value.rejected"
+    );
+    let writes = [
+        (LcsAuditEventKind::ValueSet, "lcs.audit.value.set"),
+        (LcsAuditEventKind::ValueDeleted, "lcs.audit.value.deleted"),
+        (LcsAuditEventKind::KeyTombstoned, "lcs.audit.key.tombstoned"),
+        (LcsAuditEventKind::KeyDeleted, "lcs.audit.key.deleted"),
+        (LcsAuditEventKind::KeyHidden, "lcs.audit.key.hidden"),
+        (LcsAuditEventKind::KeyCreated, "lcs.audit.key.created"),
+        (
+            LcsAuditEventKind::TransactionCommitted,
+            "lcs.audit.transaction.committed",
+        ),
+        (
+            LcsAuditEventKind::KeyDescriptorChanged,
+            "lcs.audit.key.descriptor.changed",
+        ),
+    ];
+    for (kind, name) in writes {
+        assert_eq!(kind.event_type(), name);
+    }
+}
+
+/// Every registry write record follows a result the source has already
+/// decided, so none of them can fail the operation it describes.
+#[test]
+fn lcs_write_audit_failure_policy_preserves_the_result() {
+    for kind in [
+        LcsAuditEventKind::ValueSet,
+        LcsAuditEventKind::ValueDeleted,
+        LcsAuditEventKind::KeyTombstoned,
+        LcsAuditEventKind::KeyDeleted,
+        LcsAuditEventKind::KeyHidden,
+        LcsAuditEventKind::KeyCreated,
+        LcsAuditEventKind::TransactionCommitted,
+        LcsAuditEventKind::KeyDescriptorChanged,
+    ] {
+        assert_eq!(
+            lcs_audit_emission_failure_policy(kind),
+            LcsAuditEmissionFailurePolicy::PreserveAlreadyDeterminedResult,
+            "{}",
+            kind.event_type()
+        );
+    }
+}
+
+#[test]
+fn lcs_audit_failure_policy_matches_psd_005() {
+    assert_eq!(
+        lcs_audit_emission_failure_policy(LcsAuditEventKind::KeyOpenAudit),
+        LcsAuditEmissionFailurePolicy::PreserveAlreadyDeterminedResult
+    );
+    assert_eq!(
+        lcs_audit_emission_failure_policy(LcsAuditEventKind::BackupStart),
+        LcsAuditEmissionFailurePolicy::FailOperationWithEio
+    );
+    assert_eq!(
+        lcs_audit_emission_failure_policy(LcsAuditEventKind::RestoreStart),
+        LcsAuditEmissionFailurePolicy::FailOperationWithEio
+    );
+    assert_eq!(
+        lcs_audit_emission_failure_policy(LcsAuditEventKind::BackupComplete),
+        LcsAuditEmissionFailurePolicy::PreserveAlreadyDeterminedResult
+    );
+    assert_eq!(
+        lcs_audit_emission_failure_policy(LcsAuditEventKind::RestoreComplete),
+        LcsAuditEmissionFailurePolicy::PreserveAlreadyDeterminedResult
+    );
+    assert_eq!(
+        lcs_audit_emission_failure_policy(LcsAuditEventKind::SourceValidationFailure),
+        LcsAuditEmissionFailurePolicy::PreserveAlreadyDeterminedResult
+    );
+    assert_eq!(
+        lcs_audit_emission_failure_policy(LcsAuditEventKind::SelfConfigInvalid),
+        LcsAuditEmissionFailurePolicy::PreserveRetainedConfiguration
+    );
+}
+
+#[test]
+fn self_config_invalid_audit_record_carries_required_fields() {
+    let current = LcsLimits {
+        request_timeout_ms: 45_000,
+        ..LcsLimits::default()
+    };
+
+    assert_eq!(
+        plan_self_config_invalid_audit_record(
+            &current,
+            REQUEST_TIMEOUT_MS,
+            Some(lcs_core::SelfConfigValue::Dword(999_999))
+        ),
+        Some(LcsSelfConfigInvalidAuditRecord {
+            event_kind: LcsAuditEventKind::SelfConfigInvalid,
+            configuration_parent_path: LCS_CONFIG_ROOT_PATH,
+            configuration_name: "RequestTimeoutMs",
+            expected_type: REG_DWORD,
+            expected_min: 1_000,
+            expected_max: 600_000,
+            received: LcsSelfConfigReceivedValue::DwordOutOfRange { value: 999_999 },
+            retained_value: 45_000,
+        })
+    );
+
+    assert_eq!(
+        plan_self_config_invalid_audit_record(
+            &current,
+            REQUEST_TIMEOUT_MS,
+            Some(lcs_core::SelfConfigValue::WrongType {
+                actual_type: REG_SZ,
+            })
+        )
+        .unwrap()
+        .received,
+        LcsSelfConfigReceivedValue::WrongType {
+            actual_type: REG_SZ
+        }
+    );
+
+    assert_eq!(
+        plan_self_config_invalid_audit_record(&current, REQUEST_TIMEOUT_MS, None)
+            .unwrap()
+            .received,
+        LcsSelfConfigReceivedValue::Missing
+    );
+}
+
+#[test]
+fn self_config_audit_record_is_absent_for_valid_value() {
+    assert_eq!(
+        plan_self_config_invalid_audit_record(
+            &LcsLimits::default(),
+            REQUEST_TIMEOUT_MS,
+            Some(lcs_core::SelfConfigValue::Dword(60_000))
+        ),
+        None
+    );
+}

@@ -1,0 +1,956 @@
+mod common;
+use common::{basic_ace, parse_sid, sid_bytes};
+use kacs_core::{
+    evaluate_dacl, GenericMapping, SecurityDescriptor, SidAndAttributes, TokenView,
+    ACCESS_ALLOWED_ACE_TYPE, ACCESS_ALLOWED_CALLBACK_ACE_TYPE, ACCESS_ALLOWED_OBJECT_ACE_TYPE,
+    ACCESS_DENIED_ACE_TYPE, ACE_OBJECT_TYPE_PRESENT, DELETE, GENERIC_READ, MAXIMUM_ALLOWED,
+    READ_CONTROL, SE_DACL_PRESENT, SE_GROUP_ENABLED, SE_GROUP_USE_FOR_DENY_ONLY, SE_SELF_RELATIVE,
+    SYSTEM_RESOURCE_ATTRIBUTE_ACE_TYPE, WRITE_DAC,
+};
+
+fn object_ace(
+    ace_type: u8,
+    flags: u8,
+    mask: u32,
+    object_flags: u32,
+    object_type: Option<[u8; 16]>,
+    sid: &[u8],
+) -> Vec<u8> {
+    let mut body = Vec::new();
+    body.extend_from_slice(&mask.to_le_bytes());
+    body.extend_from_slice(&object_flags.to_le_bytes());
+    if let Some(guid) = object_type {
+        body.extend_from_slice(&guid);
+    }
+    body.extend_from_slice(sid);
+
+    let size = 4 + body.len();
+    let mut bytes = Vec::with_capacity(size);
+    bytes.push(ace_type);
+    bytes.push(flags);
+    bytes.extend_from_slice(&(size as u16).to_le_bytes());
+    bytes.extend_from_slice(&body);
+    bytes
+}
+
+fn callback_ace(ace_type: u8, flags: u8, mask: u32, sid: &[u8], app_data: &[u8]) -> Vec<u8> {
+    let size = 8 + sid.len() + app_data.len();
+    let mut bytes = Vec::with_capacity(size);
+    bytes.push(ace_type);
+    bytes.push(flags);
+    bytes.extend_from_slice(&(size as u16).to_le_bytes());
+    bytes.extend_from_slice(&mask.to_le_bytes());
+    bytes.extend_from_slice(sid);
+    bytes.extend_from_slice(app_data);
+    bytes
+}
+
+fn utf16_cstr(value: &str) -> Vec<u8> {
+    let mut bytes = Vec::new();
+    for unit in value.encode_utf16() {
+        bytes.extend_from_slice(&unit.to_le_bytes());
+    }
+    bytes.extend_from_slice(&0u16.to_le_bytes());
+    bytes
+}
+
+fn int64_claim(name: &str, value: i64) -> Vec<u8> {
+    let mut bytes = Vec::new();
+    let values_start = 20usize;
+    let name_offset = 28usize;
+
+    bytes.extend_from_slice(&(name_offset as u32).to_le_bytes());
+    bytes.extend_from_slice(&0x0001u16.to_le_bytes());
+    bytes.extend_from_slice(&0u16.to_le_bytes());
+    bytes.extend_from_slice(&0u32.to_le_bytes());
+    bytes.extend_from_slice(&1u32.to_le_bytes());
+    bytes.extend_from_slice(&(values_start as u32).to_le_bytes());
+    bytes.extend_from_slice(&value.to_le_bytes());
+    bytes.extend_from_slice(&utf16_cstr(name));
+    bytes
+}
+
+fn resource_attribute_ace(flags: u8, mask: u32, sid: &[u8], application_data: &[u8]) -> Vec<u8> {
+    let unpadded_size = 8 + sid.len() + application_data.len();
+    let size = (unpadded_size + 3) & !3;
+    let mut bytes = Vec::with_capacity(size);
+    bytes.push(SYSTEM_RESOURCE_ATTRIBUTE_ACE_TYPE);
+    bytes.push(flags);
+    bytes.extend_from_slice(&(size as u16).to_le_bytes());
+    bytes.extend_from_slice(&mask.to_le_bytes());
+    bytes.extend_from_slice(sid);
+    bytes.extend_from_slice(application_data);
+    bytes.resize(size, 0);
+    bytes
+}
+
+fn opaque_ace(ace_type: u8, ace_size: u16) -> Vec<u8> {
+    let mut bytes = vec![0u8; ace_size as usize];
+    bytes[0] = ace_type;
+    bytes[2..4].copy_from_slice(&ace_size.to_le_bytes());
+    bytes
+}
+
+fn acl_bytes(aces: &[Vec<u8>]) -> Vec<u8> {
+    let size = 8 + aces.iter().map(Vec::len).sum::<usize>();
+    let mut bytes = Vec::with_capacity(size);
+    bytes.push(2);
+    bytes.push(0);
+    bytes.extend_from_slice(&(size as u16).to_le_bytes());
+    bytes.extend_from_slice(&(aces.len() as u16).to_le_bytes());
+    bytes.extend_from_slice(&0u16.to_le_bytes());
+    for ace in aces {
+        bytes.extend_from_slice(ace);
+    }
+    bytes
+}
+
+fn sd_with_dacl(owner: &[u8], dacl: Option<&[u8]>) -> Vec<u8> {
+    let control = SE_SELF_RELATIVE | if dacl.is_some() { SE_DACL_PRESENT } else { 0 };
+    let mut bytes = vec![0u8; 20];
+    bytes[0] = 1;
+    bytes[2..4].copy_from_slice(&control.to_le_bytes());
+    bytes[4..8].copy_from_slice(&20u32.to_le_bytes());
+    bytes.extend_from_slice(owner);
+    if let Some(dacl) = dacl {
+        let dacl_offset = bytes.len() as u32;
+        bytes[16..20].copy_from_slice(&dacl_offset.to_le_bytes());
+        bytes.extend_from_slice(dacl);
+    }
+    bytes
+}
+
+fn mapping() -> GenericMapping {
+    GenericMapping {
+        read: READ_CONTROL | 0x0000_0001,
+        write: WRITE_DAC | 0x0000_0002,
+        execute: 0x0000_0004,
+        all: DELETE | READ_CONTROL | WRITE_DAC | 0x0000_0007,
+    }
+}
+
+#[test]
+fn grants_access_for_matching_user_allow_ace() {
+    let user = sid_bytes([0, 0, 0, 0, 0, 5], &[21, 1000]);
+    let dacl = acl_bytes(&[basic_ace(ACCESS_ALLOWED_ACE_TYPE, 0, READ_CONTROL, &user)]);
+    let sd_bytes = sd_with_dacl(&user, Some(&dacl));
+    let sd = SecurityDescriptor::parse(&sd_bytes).expect("sd should parse");
+    let token = TokenView {
+        user: parse_sid(&user),
+        user_deny_only: false,
+        groups: &[],
+    };
+
+    let result = evaluate_dacl(&sd, &token, READ_CONTROL, &mapping(), false)
+        .expect("evaluation should succeed");
+
+    assert!(result.success);
+    assert_eq!(result.granted, READ_CONTROL | WRITE_DAC);
+}
+
+#[test]
+fn deny_only_user_does_not_match_allow_but_matches_deny() {
+    let owner = sid_bytes([0, 0, 0, 0, 0, 5], &[18]);
+    let user = sid_bytes([0, 0, 0, 0, 0, 5], &[21, 1001]);
+    let dacl = acl_bytes(&[
+        basic_ace(ACCESS_DENIED_ACE_TYPE, 0, READ_CONTROL, &user),
+        basic_ace(ACCESS_ALLOWED_ACE_TYPE, 0, READ_CONTROL, &user),
+    ]);
+    let sd_bytes = sd_with_dacl(&owner, Some(&dacl));
+    let sd = SecurityDescriptor::parse(&sd_bytes).expect("sd should parse");
+    let token = TokenView {
+        user: parse_sid(&user),
+        user_deny_only: true,
+        groups: &[],
+    };
+
+    let result = evaluate_dacl(&sd, &token, READ_CONTROL, &mapping(), false)
+        .expect("evaluation should succeed");
+
+    assert!(!result.success);
+    assert_eq!(result.granted, 0);
+}
+
+#[test]
+fn enabled_group_matches_allow_and_deny_only_group_matches_deny() {
+    let owner = sid_bytes([0, 0, 0, 0, 0, 5], &[18]);
+    let user = sid_bytes([0, 0, 0, 0, 0, 5], &[21, 1002]);
+    let enabled_group_bytes = sid_bytes([0, 0, 0, 0, 0, 5], &[32, 544]);
+    let deny_only_group_bytes = sid_bytes([0, 0, 0, 0, 0, 5], &[32, 545]);
+    let groups = [
+        SidAndAttributes {
+            sid: parse_sid(&enabled_group_bytes),
+            attributes: SE_GROUP_ENABLED,
+        },
+        SidAndAttributes {
+            sid: parse_sid(&deny_only_group_bytes),
+            attributes: SE_GROUP_USE_FOR_DENY_ONLY,
+        },
+    ];
+    let dacl = acl_bytes(&[
+        basic_ace(ACCESS_DENIED_ACE_TYPE, 0, WRITE_DAC, &deny_only_group_bytes),
+        basic_ace(
+            ACCESS_ALLOWED_ACE_TYPE,
+            0,
+            READ_CONTROL,
+            &enabled_group_bytes,
+        ),
+    ]);
+    let sd_bytes = sd_with_dacl(&owner, Some(&dacl));
+    let sd = SecurityDescriptor::parse(&sd_bytes).expect("sd should parse");
+    let token = TokenView {
+        user: parse_sid(&user),
+        user_deny_only: false,
+        groups: &groups,
+    };
+
+    let result = evaluate_dacl(&sd, &token, READ_CONTROL | WRITE_DAC, &mapping(), false)
+        .expect("evaluation should succeed");
+
+    assert!(!result.success);
+    assert_eq!(result.granted, READ_CONTROL);
+}
+
+#[test]
+fn owner_group_receives_implicit_rights() {
+    let owner_group_bytes = sid_bytes([0, 0, 0, 0, 0, 5], &[32, 551]);
+    let user = sid_bytes([0, 0, 0, 0, 0, 5], &[21, 1002, 7]);
+    let groups = [SidAndAttributes {
+        sid: parse_sid(&owner_group_bytes),
+        attributes: SE_GROUP_ENABLED,
+    }];
+    let dacl = acl_bytes(&[]);
+    let sd_bytes = sd_with_dacl(&owner_group_bytes, Some(&dacl));
+    let sd = SecurityDescriptor::parse(&sd_bytes).expect("sd should parse");
+    let token = TokenView {
+        user: parse_sid(&user),
+        user_deny_only: false,
+        groups: &groups,
+    };
+
+    let result = evaluate_dacl(&sd, &token, READ_CONTROL | WRITE_DAC, &mapping(), false)
+        .expect("evaluation should succeed");
+
+    assert!(result.success);
+    assert_eq!(result.granted, READ_CONTROL | WRITE_DAC);
+}
+
+#[test]
+fn deny_only_owner_group_still_establishes_ownership() {
+    let owner_group_bytes = sid_bytes([0, 0, 0, 0, 0, 5], &[32, 552]);
+    let user = sid_bytes([0, 0, 0, 0, 0, 5], &[21, 1002, 9]);
+    let groups = [SidAndAttributes {
+        sid: parse_sid(&owner_group_bytes),
+        attributes: SE_GROUP_USE_FOR_DENY_ONLY,
+    }];
+    let dacl = acl_bytes(&[]);
+    let sd_bytes = sd_with_dacl(&owner_group_bytes, Some(&dacl));
+    let sd = SecurityDescriptor::parse(&sd_bytes).expect("sd should parse");
+    let token = TokenView {
+        user: parse_sid(&user),
+        user_deny_only: false,
+        groups: &groups,
+    };
+
+    let result = evaluate_dacl(&sd, &token, READ_CONTROL | WRITE_DAC, &mapping(), false)
+        .expect("evaluation should succeed");
+
+    assert!(result.success);
+    assert_eq!(result.granted, READ_CONTROL | WRITE_DAC);
+}
+
+#[test]
+fn owner_implicit_rights_survive_later_owner_deny_ace() {
+    let owner = sid_bytes([0, 0, 0, 0, 0, 5], &[21, 1002, 6]);
+    let dacl = acl_bytes(&[basic_ace(
+        ACCESS_DENIED_ACE_TYPE,
+        0,
+        READ_CONTROL | WRITE_DAC,
+        &owner,
+    )]);
+    let sd_bytes = sd_with_dacl(&owner, Some(&dacl));
+    let sd = SecurityDescriptor::parse(&sd_bytes).expect("sd should parse");
+    let token = TokenView {
+        user: parse_sid(&owner),
+        user_deny_only: false,
+        groups: &[],
+    };
+
+    let result = evaluate_dacl(&sd, &token, READ_CONTROL | WRITE_DAC, &mapping(), false)
+        .expect("evaluation should succeed");
+
+    assert!(result.success);
+    assert_eq!(result.granted, READ_CONTROL | WRITE_DAC);
+}
+
+#[test]
+fn deny_only_owner_still_matches_owner_rights_deny_aces() {
+    let owner_rights = sid_bytes([0, 0, 0, 0, 0, 3], &[4]);
+    let owner = sid_bytes([0, 0, 0, 0, 0, 5], &[21, 1002, 8]);
+    let dacl = acl_bytes(&[basic_ace(
+        ACCESS_DENIED_ACE_TYPE,
+        0,
+        READ_CONTROL | WRITE_DAC,
+        &owner_rights,
+    )]);
+    let sd_bytes = sd_with_dacl(&owner, Some(&dacl));
+    let sd = SecurityDescriptor::parse(&sd_bytes).expect("sd should parse");
+    let token = TokenView {
+        user: parse_sid(&owner),
+        user_deny_only: true,
+        groups: &[],
+    };
+
+    let result = evaluate_dacl(&sd, &token, READ_CONTROL | WRITE_DAC, &mapping(), false)
+        .expect("evaluation should succeed");
+
+    assert!(!result.success);
+    assert_eq!(result.granted, 0);
+}
+
+#[test]
+fn disabled_group_matches_neither_allow_nor_deny() {
+    let owner = sid_bytes([0, 0, 0, 0, 0, 5], &[18]);
+    let user = sid_bytes([0, 0, 0, 0, 0, 5], &[21, 1003]);
+    let disabled_group_bytes = sid_bytes([0, 0, 0, 0, 0, 5], &[32, 546]);
+    let groups = [SidAndAttributes {
+        sid: parse_sid(&disabled_group_bytes),
+        attributes: 0,
+    }];
+    let dacl = acl_bytes(&[
+        basic_ace(ACCESS_DENIED_ACE_TYPE, 0, WRITE_DAC, &disabled_group_bytes),
+        basic_ace(
+            ACCESS_ALLOWED_ACE_TYPE,
+            0,
+            READ_CONTROL,
+            &disabled_group_bytes,
+        ),
+    ]);
+    let sd_bytes = sd_with_dacl(&owner, Some(&dacl));
+    let sd = SecurityDescriptor::parse(&sd_bytes).expect("sd should parse");
+    let token = TokenView {
+        user: parse_sid(&user),
+        user_deny_only: false,
+        groups: &groups,
+    };
+
+    let result = evaluate_dacl(&sd, &token, READ_CONTROL | WRITE_DAC, &mapping(), false)
+        .expect("evaluation should succeed");
+
+    assert!(!result.success);
+    assert_eq!(result.granted, 0);
+}
+
+#[test]
+fn enabled_group_matches_deny_and_deny_only_group_does_not_match_allow() {
+    let owner = sid_bytes([0, 0, 0, 0, 0, 5], &[18]);
+    let user = sid_bytes([0, 0, 0, 0, 0, 5], &[21, 1003, 1]);
+    let enabled_group_bytes = sid_bytes([0, 0, 0, 0, 0, 5], &[32, 552]);
+    let deny_only_group_bytes = sid_bytes([0, 0, 0, 0, 0, 5], &[32, 553]);
+    let groups = [
+        SidAndAttributes {
+            sid: parse_sid(&enabled_group_bytes),
+            attributes: SE_GROUP_ENABLED,
+        },
+        SidAndAttributes {
+            sid: parse_sid(&deny_only_group_bytes),
+            attributes: SE_GROUP_ENABLED | SE_GROUP_USE_FOR_DENY_ONLY,
+        },
+    ];
+    let dacl = acl_bytes(&[
+        basic_ace(
+            ACCESS_ALLOWED_ACE_TYPE,
+            0,
+            READ_CONTROL,
+            &deny_only_group_bytes,
+        ),
+        basic_ace(ACCESS_DENIED_ACE_TYPE, 0, WRITE_DAC, &enabled_group_bytes),
+    ]);
+    let sd_bytes = sd_with_dacl(&owner, Some(&dacl));
+    let sd = SecurityDescriptor::parse(&sd_bytes).expect("sd should parse");
+    let token = TokenView {
+        user: parse_sid(&user),
+        user_deny_only: false,
+        groups: &groups,
+    };
+
+    let result = evaluate_dacl(&sd, &token, READ_CONTROL | WRITE_DAC, &mapping(), false)
+        .expect("evaluation should succeed");
+
+    assert!(!result.success);
+    assert_eq!(result.granted, 0);
+}
+
+#[test]
+fn empty_dacl_still_grants_owner_implicit_rights() {
+    let user = sid_bytes([0, 0, 0, 0, 0, 5], &[18]);
+    let dacl = acl_bytes(&[]);
+    let sd_bytes = sd_with_dacl(&user, Some(&dacl));
+    let sd = SecurityDescriptor::parse(&sd_bytes).expect("sd should parse");
+    let token = TokenView {
+        user: parse_sid(&user),
+        user_deny_only: false,
+        groups: &[],
+    };
+
+    let result = evaluate_dacl(&sd, &token, READ_CONTROL | WRITE_DAC, &mapping(), false)
+        .expect("evaluation should succeed");
+
+    assert!(result.success);
+    assert_eq!(result.granted, READ_CONTROL | WRITE_DAC);
+}
+
+#[test]
+fn empty_dacl_denies_non_owner() {
+    let owner = sid_bytes([0, 0, 0, 0, 0, 5], &[18]);
+    let user = sid_bytes([0, 0, 0, 0, 0, 5], &[21, 1004, 1]);
+    let dacl = acl_bytes(&[]);
+    let sd_bytes = sd_with_dacl(&owner, Some(&dacl));
+    let sd = SecurityDescriptor::parse(&sd_bytes).expect("sd should parse");
+    let token = TokenView {
+        user: parse_sid(&user),
+        user_deny_only: false,
+        groups: &[],
+    };
+
+    let result = evaluate_dacl(&sd, &token, READ_CONTROL, &mapping(), false)
+        .expect("evaluation should succeed");
+
+    assert!(!result.success);
+    assert_eq!(result.granted, 0);
+}
+
+#[test]
+fn pure_maximum_allowed_succeeds_with_zero_grants() {
+    let owner = sid_bytes([0, 0, 0, 0, 0, 5], &[18]);
+    let user = sid_bytes([0, 0, 0, 0, 0, 5], &[21, 1004, 2]);
+    let dacl = acl_bytes(&[]);
+    let sd_bytes = sd_with_dacl(&owner, Some(&dacl));
+    let sd = SecurityDescriptor::parse(&sd_bytes).expect("sd should parse");
+    let token = TokenView {
+        user: parse_sid(&user),
+        user_deny_only: false,
+        groups: &[],
+    };
+
+    let result = evaluate_dacl(&sd, &token, MAXIMUM_ALLOWED, &mapping(), false)
+        .expect("evaluation should succeed");
+
+    assert!(result.success);
+    assert_eq!(result.granted, 0);
+}
+
+#[test]
+fn skip_owner_implicit_disables_owner_bypass() {
+    let user = sid_bytes([0, 0, 0, 0, 0, 5], &[18]);
+    let dacl = acl_bytes(&[]);
+    let sd_bytes = sd_with_dacl(&user, Some(&dacl));
+    let sd = SecurityDescriptor::parse(&sd_bytes).expect("sd should parse");
+    let token = TokenView {
+        user: parse_sid(&user),
+        user_deny_only: false,
+        groups: &[],
+    };
+
+    let result = evaluate_dacl(&sd, &token, READ_CONTROL | WRITE_DAC, &mapping(), true)
+        .expect("evaluation should succeed");
+
+    assert!(!result.success);
+    assert_eq!(result.granted, 0);
+}
+
+#[test]
+fn owner_rights_ace_suppresses_implicit_owner_grant() {
+    let owner = sid_bytes([0, 0, 0, 0, 0, 5], &[18]);
+    let owner_rights = sid_bytes([0, 0, 0, 0, 0, 3], &[4]);
+    let dacl = acl_bytes(&[basic_ace(
+        ACCESS_ALLOWED_ACE_TYPE,
+        0,
+        READ_CONTROL,
+        &owner_rights,
+    )]);
+    let sd_bytes = sd_with_dacl(&owner, Some(&dacl));
+    let sd = SecurityDescriptor::parse(&sd_bytes).expect("sd should parse");
+    let token = TokenView {
+        user: parse_sid(&owner),
+        user_deny_only: false,
+        groups: &[],
+    };
+
+    let result = evaluate_dacl(&sd, &token, READ_CONTROL | WRITE_DAC, &mapping(), false)
+        .expect("evaluation should succeed");
+
+    assert!(!result.success);
+    assert_eq!(result.granted, READ_CONTROL);
+}
+
+#[test]
+fn inherit_only_owner_rights_ace_does_not_suppress_implicit_owner_grant() {
+    let owner = sid_bytes([0, 0, 0, 0, 0, 5], &[18]);
+    let owner_rights = sid_bytes([0, 0, 0, 0, 0, 3], &[4]);
+    let dacl = acl_bytes(&[basic_ace(
+        ACCESS_DENIED_ACE_TYPE,
+        0x08,
+        READ_CONTROL | WRITE_DAC,
+        &owner_rights,
+    )]);
+    let sd_bytes = sd_with_dacl(&owner, Some(&dacl));
+    let sd = SecurityDescriptor::parse(&sd_bytes).expect("sd should parse");
+    let token = TokenView {
+        user: parse_sid(&owner),
+        user_deny_only: false,
+        groups: &[],
+    };
+
+    let result = evaluate_dacl(&sd, &token, READ_CONTROL | WRITE_DAC, &mapping(), false)
+        .expect("evaluation should succeed");
+
+    assert!(result.success);
+    assert_eq!(result.granted, READ_CONTROL | WRITE_DAC);
+}
+
+#[test]
+fn owner_rights_allow_ace_expands_owner_access_beyond_implicit_rights() {
+    let owner = sid_bytes([0, 0, 0, 0, 0, 5], &[18]);
+    let owner_rights = sid_bytes([0, 0, 0, 0, 0, 3], &[4]);
+    let dacl = acl_bytes(&[basic_ace(ACCESS_ALLOWED_ACE_TYPE, 0, DELETE, &owner_rights)]);
+    let sd_bytes = sd_with_dacl(&owner, Some(&dacl));
+    let sd = SecurityDescriptor::parse(&sd_bytes).expect("sd should parse");
+    let token = TokenView {
+        user: parse_sid(&owner),
+        user_deny_only: false,
+        groups: &[],
+    };
+
+    let result =
+        evaluate_dacl(&sd, &token, DELETE, &mapping(), false).expect("evaluation should succeed");
+
+    assert!(result.success);
+    assert_eq!(result.granted, DELETE);
+}
+
+#[test]
+fn null_dacl_grants_all_valid_rights() {
+    let user = sid_bytes([0, 0, 0, 0, 0, 5], &[18]);
+    let sd_bytes = sd_with_dacl(&user, None);
+    let sd = SecurityDescriptor::parse(&sd_bytes).expect("sd should parse");
+    let token = TokenView {
+        user: parse_sid(&user),
+        user_deny_only: false,
+        groups: &[],
+    };
+
+    let result = evaluate_dacl(&sd, &token, MAXIMUM_ALLOWED, &mapping(), false)
+        .expect("evaluation should succeed");
+
+    assert!(result.success);
+    assert_eq!(
+        result.granted,
+        DELETE | READ_CONTROL | WRITE_DAC | 0x0000_0007
+    );
+}
+
+#[test]
+fn resource_attribute_ace_does_not_grant_access_directly() {
+    let owner = sid_bytes([0, 0, 0, 0, 0, 5], &[18]);
+    let user = sid_bytes([0, 0, 0, 0, 0, 5], &[21, 2025]);
+    let resource_attribute_sid = sid_bytes([0, 0, 0, 0, 0, 1], &[0]);
+    let dacl = acl_bytes(&[resource_attribute_ace(
+        0,
+        READ_CONTROL,
+        &resource_attribute_sid,
+        &int64_claim("Level", 7),
+    )]);
+    let sd_bytes = sd_with_dacl(&owner, Some(&dacl));
+    let sd = SecurityDescriptor::parse(&sd_bytes).expect("sd should parse");
+    let token = TokenView {
+        user: parse_sid(&user),
+        user_deny_only: false,
+        groups: &[],
+    };
+
+    let result = evaluate_dacl(&sd, &token, READ_CONTROL, &mapping(), false)
+        .expect("resource attribute ACE should not affect DACL grants");
+
+    assert!(!result.success);
+    assert_eq!(result.granted, 0);
+}
+
+#[test]
+fn inherit_only_ace_is_skipped() {
+    let user = sid_bytes([0, 0, 0, 0, 0, 5], &[21, 2000]);
+    let dacl = acl_bytes(&[basic_ace(
+        ACCESS_ALLOWED_ACE_TYPE,
+        0x08,
+        READ_CONTROL,
+        &user,
+    )]);
+    let sd_bytes = sd_with_dacl(&user, Some(&dacl));
+    let sd = SecurityDescriptor::parse(&sd_bytes).expect("sd should parse");
+    let token = TokenView {
+        user: parse_sid(&user),
+        user_deny_only: false,
+        groups: &[],
+    };
+
+    let result = evaluate_dacl(&sd, &token, GENERIC_READ, &mapping(), true)
+        .expect("evaluation should succeed");
+
+    assert!(!result.success);
+    assert_eq!(result.granted, 0);
+}
+
+#[test]
+fn malformed_callback_allow_ace_is_skipped_as_unknown() {
+    let owner = sid_bytes([0, 0, 0, 0, 0, 5], &[18]);
+    let user = sid_bytes([0, 0, 0, 0, 0, 5], &[21, 2001]);
+    let dacl = acl_bytes(&[callback_ace(
+        ACCESS_ALLOWED_CALLBACK_ACE_TYPE,
+        0,
+        READ_CONTROL,
+        &user,
+        b"artx",
+    )]);
+    let sd_bytes = sd_with_dacl(&owner, Some(&dacl));
+    let sd = SecurityDescriptor::parse(&sd_bytes).expect("sd should parse");
+    let token = TokenView {
+        user: parse_sid(&user),
+        user_deny_only: false,
+        groups: &[],
+    };
+
+    let result = evaluate_dacl(&sd, &token, READ_CONTROL, &mapping(), false)
+        .expect("malformed callback ace should not error");
+
+    assert!(!result.success);
+    assert_eq!(result.granted, 0);
+}
+
+#[test]
+fn object_ace_without_object_type_guid_behaves_like_basic_allow() {
+    let user = sid_bytes([0, 0, 0, 0, 0, 5], &[21, 2002]);
+    let dacl = acl_bytes(&[object_ace(
+        ACCESS_ALLOWED_OBJECT_ACE_TYPE,
+        0,
+        READ_CONTROL,
+        0,
+        None,
+        &user,
+    )]);
+    let sd_bytes = sd_with_dacl(&user, Some(&dacl));
+    let sd = SecurityDescriptor::parse(&sd_bytes).expect("sd should parse");
+    let token = TokenView {
+        user: parse_sid(&user),
+        user_deny_only: false,
+        groups: &[],
+    };
+
+    let result = evaluate_dacl(&sd, &token, READ_CONTROL, &mapping(), false)
+        .expect("evaluation should succeed");
+
+    assert!(result.success);
+    assert_eq!(result.granted, READ_CONTROL | WRITE_DAC);
+}
+
+#[test]
+fn object_ace_with_object_type_guid_behaves_like_basic_allow_without_tree() {
+    let user = sid_bytes([0, 0, 0, 0, 0, 5], &[21, 2003]);
+    let dacl = acl_bytes(&[object_ace(
+        ACCESS_ALLOWED_OBJECT_ACE_TYPE,
+        0,
+        READ_CONTROL,
+        ACE_OBJECT_TYPE_PRESENT,
+        Some([0x22; 16]),
+        &user,
+    )]);
+    let sd_bytes = sd_with_dacl(&user, Some(&dacl));
+    let sd = SecurityDescriptor::parse(&sd_bytes).expect("sd should parse");
+    let token = TokenView {
+        user: parse_sid(&user),
+        user_deny_only: false,
+        groups: &[],
+    };
+
+    let result = evaluate_dacl(&sd, &token, READ_CONTROL, &mapping(), false)
+        .expect("guid-scoped object ace should behave globally without a tree");
+
+    assert!(result.success);
+    assert_eq!(result.granted, READ_CONTROL | WRITE_DAC);
+}
+
+#[test]
+fn first_writer_wins_uses_received_dacl_order() {
+    let owner = sid_bytes([0, 0, 0, 0, 0, 5], &[18]);
+    let user = sid_bytes([0, 0, 0, 0, 0, 5], &[21, 2004]);
+    let dacl = acl_bytes(&[
+        basic_ace(ACCESS_ALLOWED_ACE_TYPE, 0, READ_CONTROL, &user),
+        basic_ace(ACCESS_DENIED_ACE_TYPE, 0, READ_CONTROL, &user),
+    ]);
+    let sd_bytes = sd_with_dacl(&owner, Some(&dacl));
+    let sd = SecurityDescriptor::parse(&sd_bytes).expect("sd should parse");
+    let token = TokenView {
+        user: parse_sid(&user),
+        user_deny_only: false,
+        groups: &[],
+    };
+
+    let result = evaluate_dacl(&sd, &token, READ_CONTROL, &mapping(), false)
+        .expect("evaluation should succeed");
+
+    assert!(result.success);
+    assert_eq!(result.granted, READ_CONTROL);
+}
+
+#[test]
+fn first_writer_wins_denial_blocks_later_allow() {
+    let owner = sid_bytes([0, 0, 0, 0, 0, 5], &[18]);
+    let user = sid_bytes([0, 0, 0, 0, 0, 5], &[21, 2004, 1]);
+    let dacl = acl_bytes(&[
+        basic_ace(ACCESS_DENIED_ACE_TYPE, 0, READ_CONTROL, &user),
+        basic_ace(ACCESS_ALLOWED_ACE_TYPE, 0, READ_CONTROL, &user),
+    ]);
+    let sd_bytes = sd_with_dacl(&owner, Some(&dacl));
+    let sd = SecurityDescriptor::parse(&sd_bytes).expect("sd should parse");
+    let token = TokenView {
+        user: parse_sid(&user),
+        user_deny_only: false,
+        groups: &[],
+    };
+
+    let result = evaluate_dacl(&sd, &token, READ_CONTROL, &mapping(), false)
+        .expect("evaluation should succeed");
+
+    assert!(!result.success);
+    assert_eq!(result.granted, 0);
+}
+
+#[test]
+fn ace_mask_mapping_does_not_mutate_descriptor_bytes() {
+    let owner = sid_bytes([0, 0, 0, 0, 0, 5], &[18]);
+    let user = sid_bytes([0, 0, 0, 0, 0, 5], &[21, 2004, 2]);
+    let dacl = acl_bytes(&[basic_ace(ACCESS_ALLOWED_ACE_TYPE, 0, GENERIC_READ, &user)]);
+    let sd_bytes = sd_with_dacl(&owner, Some(&dacl));
+    let original_sd_bytes = sd_bytes.clone();
+    let sd = SecurityDescriptor::parse(&sd_bytes).expect("sd should parse");
+    let token = TokenView {
+        user: parse_sid(&user),
+        user_deny_only: false,
+        groups: &[],
+    };
+
+    let result = evaluate_dacl(&sd, &token, GENERIC_READ, &mapping(), false)
+        .expect("evaluation should succeed");
+
+    assert!(result.success);
+    assert_eq!(result.granted, READ_CONTROL | 0x0000_0001);
+    assert_eq!(sd_bytes, original_sd_bytes);
+}
+
+#[test]
+fn maximum_allowed_returns_full_granted_set_and_does_not_short_circuit() {
+    let owner = sid_bytes([0, 0, 0, 0, 0, 5], &[18]);
+    let user = sid_bytes([0, 0, 0, 0, 0, 5], &[21, 2005]);
+    let dacl = acl_bytes(&[
+        basic_ace(ACCESS_ALLOWED_ACE_TYPE, 0, READ_CONTROL, &user),
+        basic_ace(ACCESS_ALLOWED_ACE_TYPE, 0, WRITE_DAC, &user),
+    ]);
+    let sd_bytes = sd_with_dacl(&owner, Some(&dacl));
+    let sd = SecurityDescriptor::parse(&sd_bytes).expect("sd should parse");
+    let token = TokenView {
+        user: parse_sid(&user),
+        user_deny_only: false,
+        groups: &[],
+    };
+
+    let result = evaluate_dacl(
+        &sd,
+        &token,
+        MAXIMUM_ALLOWED | READ_CONTROL,
+        &mapping(),
+        false,
+    )
+    .expect("evaluation should succeed");
+
+    assert!(result.success);
+    assert_eq!(result.granted, READ_CONTROL | WRITE_DAC);
+}
+
+#[test]
+fn maximum_allowed_preserves_first_writer_wins_for_noncanonical_dacl() {
+    let owner = sid_bytes([0, 0, 0, 0, 0, 5], &[18]);
+    let user = sid_bytes([0, 0, 0, 0, 0, 5], &[21, 2005, 1]);
+    let dacl = acl_bytes(&[
+        basic_ace(ACCESS_ALLOWED_ACE_TYPE, 0, READ_CONTROL, &user),
+        basic_ace(ACCESS_DENIED_ACE_TYPE, 0, WRITE_DAC, &user),
+        basic_ace(ACCESS_ALLOWED_ACE_TYPE, 0, WRITE_DAC, &user),
+    ]);
+    let sd_bytes = sd_with_dacl(&owner, Some(&dacl));
+    let sd = SecurityDescriptor::parse(&sd_bytes).expect("sd should parse");
+    let token = TokenView {
+        user: parse_sid(&user),
+        user_deny_only: false,
+        groups: &[],
+    };
+
+    let result = evaluate_dacl(&sd, &token, MAXIMUM_ALLOWED, &mapping(), false)
+        .expect("evaluation should succeed");
+
+    assert!(result.success);
+    assert_eq!(result.granted, READ_CONTROL);
+}
+
+#[test]
+fn unknown_ace_types_are_skipped_during_evaluation() {
+    let owner = sid_bytes([0, 0, 0, 0, 0, 5], &[18]);
+    let user = sid_bytes([0, 0, 0, 0, 0, 5], &[21, 2006]);
+    let dacl = acl_bytes(&[
+        opaque_ace(0x7f, 4),
+        basic_ace(ACCESS_ALLOWED_ACE_TYPE, 0, READ_CONTROL, &user),
+    ]);
+    let sd_bytes = sd_with_dacl(&owner, Some(&dacl));
+    let sd = SecurityDescriptor::parse(&sd_bytes).expect("sd should parse");
+    let token = TokenView {
+        user: parse_sid(&user),
+        user_deny_only: false,
+        groups: &[],
+    };
+
+    let result = evaluate_dacl(&sd, &token, READ_CONTROL, &mapping(), false)
+        .expect("evaluation should succeed");
+
+    assert!(result.success);
+    assert_eq!(result.granted, READ_CONTROL);
+}
+
+// --- OWNER RIGHTS obeys the ordinary polarity rules (PEI-248) ---
+
+#[test]
+fn deny_only_group_owner_does_not_match_owner_rights_allow_aces() {
+    // A restricted token made by setting Administrators to deny-only may only
+    // block through that group, never gain through it. If the object's owner
+    // *is* Administrators, an allow ACE on S-1-3-4 used to grant anyway,
+    // because the owner match was presence-based and ignored the attribute.
+    //
+    // WRITE_DAC is the right that makes this bite: it rewrites the DACL.
+    let owner_rights = sid_bytes([0, 0, 0, 0, 0, 3], &[4]);
+    let administrators = sid_bytes([0, 0, 0, 0, 0, 5], &[32, 544]);
+    let user = sid_bytes([0, 0, 0, 0, 0, 5], &[21, 2001]);
+    let groups = [SidAndAttributes {
+        sid: parse_sid(&administrators),
+        attributes: SE_GROUP_USE_FOR_DENY_ONLY,
+    }];
+    let dacl = acl_bytes(&[basic_ace(
+        ACCESS_ALLOWED_ACE_TYPE,
+        0,
+        READ_CONTROL | WRITE_DAC,
+        &owner_rights,
+    )]);
+    let sd_bytes = sd_with_dacl(&administrators, Some(&dacl));
+    let sd = SecurityDescriptor::parse(&sd_bytes).expect("sd should parse");
+    let token = TokenView {
+        user: parse_sid(&user),
+        user_deny_only: false,
+        groups: &groups,
+    };
+
+    let result = evaluate_dacl(&sd, &token, READ_CONTROL | WRITE_DAC, &mapping(), false)
+        .expect("evaluation should succeed");
+
+    assert!(!result.success);
+    assert_eq!(result.granted, 0);
+}
+
+#[test]
+fn deny_only_group_owner_still_matches_owner_rights_deny_aces() {
+    // The other half of the rule, and the reason the fix is polarity-aware
+    // rather than simply stricter: a deny-only group must still *block*.
+    let owner_rights = sid_bytes([0, 0, 0, 0, 0, 3], &[4]);
+    let administrators = sid_bytes([0, 0, 0, 0, 0, 5], &[32, 544]);
+    let user = sid_bytes([0, 0, 0, 0, 0, 5], &[21, 2002]);
+    let groups = [SidAndAttributes {
+        sid: parse_sid(&administrators),
+        attributes: SE_GROUP_USE_FOR_DENY_ONLY,
+    }];
+    let dacl = acl_bytes(&[
+        basic_ace(ACCESS_DENIED_ACE_TYPE, 0, WRITE_DAC, &owner_rights),
+        basic_ace(ACCESS_ALLOWED_ACE_TYPE, 0, READ_CONTROL | WRITE_DAC, &user),
+    ]);
+    let sd_bytes = sd_with_dacl(&administrators, Some(&dacl));
+    let sd = SecurityDescriptor::parse(&sd_bytes).expect("sd should parse");
+    let token = TokenView {
+        user: parse_sid(&user),
+        user_deny_only: false,
+        groups: &groups,
+    };
+
+    let result = evaluate_dacl(&sd, &token, READ_CONTROL | WRITE_DAC, &mapping(), false)
+        .expect("evaluation should succeed");
+
+    assert!(!result.success);
+    assert_eq!(
+        result.granted, READ_CONTROL,
+        "WRITE_DAC must be denied through the deny-only group, READ_CONTROL still granted",
+    );
+}
+
+#[test]
+fn user_deny_only_owner_does_not_match_owner_rights_allow_aces() {
+    // A write-restricted token has user_deny_only forced true, so its user SID
+    // matches deny ACEs only. If the object's owner is that user, an allow ACE
+    // on S-1-3-4 used to match regardless.
+    let owner_rights = sid_bytes([0, 0, 0, 0, 0, 3], &[4]);
+    let owner = sid_bytes([0, 0, 0, 0, 0, 5], &[21, 2003]);
+    let dacl = acl_bytes(&[basic_ace(
+        ACCESS_ALLOWED_ACE_TYPE,
+        0,
+        READ_CONTROL | WRITE_DAC,
+        &owner_rights,
+    )]);
+    let sd_bytes = sd_with_dacl(&owner, Some(&dacl));
+    let sd = SecurityDescriptor::parse(&sd_bytes).expect("sd should parse");
+    let token = TokenView {
+        user: parse_sid(&owner),
+        user_deny_only: true,
+        groups: &[],
+    };
+
+    // skip_owner_implicit, so this measures the explicit S-1-3-4 ACE alone and
+    // not the implicit owner grant, which is a separate rule.
+    let result = evaluate_dacl(&sd, &token, READ_CONTROL | WRITE_DAC, &mapping(), true)
+        .expect("evaluation should succeed");
+
+    assert!(!result.success);
+    assert_eq!(result.granted, 0);
+}
+
+#[test]
+fn an_enabled_group_owner_still_matches_owner_rights_allow_aces() {
+    // The fix must not simply stop S-1-3-4 matching through groups. An
+    // ordinary enabled group is the common case and has to keep working.
+    let owner_rights = sid_bytes([0, 0, 0, 0, 0, 3], &[4]);
+    let administrators = sid_bytes([0, 0, 0, 0, 0, 5], &[32, 544]);
+    let user = sid_bytes([0, 0, 0, 0, 0, 5], &[21, 2004]);
+    let groups = [SidAndAttributes {
+        sid: parse_sid(&administrators),
+        attributes: SE_GROUP_ENABLED,
+    }];
+    let dacl = acl_bytes(&[basic_ace(
+        ACCESS_ALLOWED_ACE_TYPE,
+        0,
+        READ_CONTROL | WRITE_DAC,
+        &owner_rights,
+    )]);
+    let sd_bytes = sd_with_dacl(&administrators, Some(&dacl));
+    let sd = SecurityDescriptor::parse(&sd_bytes).expect("sd should parse");
+    let token = TokenView {
+        user: parse_sid(&user),
+        user_deny_only: false,
+        groups: &groups,
+    };
+
+    let result = evaluate_dacl(&sd, &token, READ_CONTROL | WRITE_DAC, &mapping(), false)
+        .expect("evaluation should succeed");
+
+    assert!(result.success);
+    assert_eq!(result.granted, READ_CONTROL | WRITE_DAC);
+}

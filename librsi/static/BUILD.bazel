@@ -1,0 +1,33 @@
+load("@crates//:crates.bzl", "all_crate_deps")
+load("@rules_rust//rust:defs.bzl", "rust_static_library")
+load("//build:version.bzl", "VERSION")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(["BUILD.bazel"])
+
+filegroup(
+    name = "sources",
+    srcs = ["BUILD.bazel"],
+)
+
+# Separate output directories prevent cdylib/staticlib intermediate object races
+# when native builds use local execution without per-action sandboxes.
+rust_static_library(
+    name = "static",
+    srcs = ["//librsi:rust-sources"],
+    compile_data = ["//librsi:rust-data"],
+    crate_name = "rsi",
+    crate_root = "//librsi:src/lib.rs",
+    edition = "2021",
+    rustc_flags = ["-Cpanic=abort"],
+    version = VERSION,
+    deps = [
+        "//:lcs-core",
+        "//:peios-uapi",
+        "//peios-cabi",
+    ] + all_crate_deps(
+        package_name = "librsi",
+        normal = True,
+    ),
+)

@@ -1,0 +1,27 @@
+[workspace]
+resolver = "2"
+members = ["libpeios", "librsi", "peios-cabi", "vendor/kernel/peios/rust/kacs-core", "vendor/kernel/peios/rust/lcs-core", "vendor/kernel/peios/rust/peios-uapi"]
+exclude = ["vendor/ppk"]
+
+[workspace.package]
+version = "0.5.11"
+edition = "2021"
+rust-version = "1.98.1"
+license = "MIT"
+publish = false
+
+[workspace.dependencies]
+peios-cabi = { path = "peios-cabi" }
+peios-uapi = { path = "vendor/kernel/peios/rust/peios-uapi", default-features = false }
+kacs-core = { path = "vendor/kernel/peios/rust/kacs-core" }
+lcs-core = { path = "vendor/kernel/peios/rust/lcs-core" }
+libc = { version = "=0.2.189", default-features = false }
+
+[profile.dev]
+panic = "abort"
+
+[profile.release]
+panic = "abort"
+debug = 2
+split-debuginfo = "off"
+incremental = false

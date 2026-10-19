@@ -1,0 +1,59 @@
+load("@crates//:crates.bzl", "all_crate_deps")
+load("@rules_rust//rust:defs.bzl", "rust_library", "rust_test")
+load("//build:version.bzl", "VERSION")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files([
+    "Cargo.toml",
+    "BUILD.bazel",
+])
+
+filegroup(
+    name = "sources",
+    srcs = glob(
+        [
+            "**",
+        ],
+        exclude = [
+            "out/**",
+            "target/**",
+            "**/__pycache__/**",
+            "**/.ruff_cache/**",
+        ],
+    ),
+)
+
+rust_library(
+    name = "peios-cabi",
+    srcs = glob(["src/**/*.rs"]),
+    compile_data = glob(
+        ["src/**"],
+        allow_empty = True,
+        exclude = ["src/**/*.rs"],
+    ) + [
+        "Cargo.toml",
+        "//:Cargo.toml",
+    ],
+    crate_name = "peios_cabi",
+    crate_root = "src/lib.rs",
+    edition = "2021",
+    rustc_flags = [],
+    version = VERSION,
+    deps = [] + all_crate_deps(normal = True),
+)
+
+rust_test(
+    name = "tests",
+    size = "small",
+    srcs = glob(["src/**/*.rs"]),
+    compile_data = glob(
+        ["src/**"],
+        allow_empty = True,
+        exclude = ["src/**/*.rs"],
+    ),
+    crate_name = "peios_cabi",
+    crate_root = "src/lib.rs",
+    edition = "2021",
+    deps = [] + all_crate_deps(normal = True),
+)

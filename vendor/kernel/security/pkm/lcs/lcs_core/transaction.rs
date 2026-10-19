@@ -1,0 +1,1082 @@
+use crate::lcs_core::casefold::casefold_eq;
+use crate::lcs_core::config::LcsLimits;
+use crate::lcs_core::constants::{
+    REG_TXN_ABORTED, REG_TXN_ACTIVE_BOUND, REG_TXN_ACTIVE_UNBOUND, REG_TXN_COMMITTED,
+    REG_TXN_SOURCE_DOWN, REG_TXN_TIMED_OUT, REG_WATCH_SD_CHANGED, RSI_TXN_READ_ONLY,
+};
+use crate::lcs_core::errno::LinuxErrno;
+use crate::lcs_core::error::{LcsError, LcsResult};
+use crate::lcs_core::hives::SourceId;
+use crate::lcs_core::path::validate_hive_name_bytes;
+use crate::lcs_core::poll::linux_poll_mask_from_readiness;
+use crate::lcs_core::resolution::Guid;
+use crate::lcs_core::rsi::RsiMappedErrno;
+use crate::lcs_core::sequence::SequenceCounter;
+use crate::lcs_core::source::NIL_GUID;
+use crate::lcs_core::watch::{
+    TransactionWatchBatchMember, WatchMutationContext, validate_watch_mutation_context,
+};
+
+/// Kernel-internal transaction identifier.
+pub type TransactionId = u64;
+
+/// Kernel-internal operation index used to preserve transaction mutation order.
+pub type TransactionOperationIndex = u64;
+
+/// Source/hive binding selected by the first mutating operation.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct TransactionBinding<'a> {
+    pub source_id: SourceId,
+    pub hive_name: &'a str,
+    pub hive_root_guid: Guid,
+}
+
+/// LCS-visible transaction state.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum TransactionState<'a> {
+    ActiveUnbound,
+    ActiveBound(TransactionBinding<'a>),
+    Committed,
+    Aborted,
+    TimedOut,
+    SourceDown,
+}
+
+/// Terminal errno class reported by REG_IOC_TXN_STATUS.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum TransactionTerminalErrno {
+    None,
+    Invalid,
+    TimedOut,
+    Io,
+}
+
+/// Result payload for REG_IOC_TXN_STATUS.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct TransactionStatusResult {
+    pub state_code: u32,
+    pub terminal_errno: TransactionTerminalErrno,
+}
+
+/// Transaction fd poll readiness bits expressed without platform poll constants.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct TransactionPollPlan {
+    pub readable: bool,
+    pub writable: bool,
+    pub hangup: bool,
+    pub error: bool,
+}
+
+/// Pre-dispatch failure class for operations using a transaction fd.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum TransactionUseFailure {
+    Invalid,
+    TimedOut,
+    SourceDown,
+    CrossHive,
+    Busy,
+    NotSupported,
+}
+
+/// Caller-visible errno class for transaction timeout use failures.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum TransactionTimeoutErrno {
+    Etimedout,
+}
+
+/// Source-dispatch-ready commit precheck.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct TransactionCommitPlan<'a> {
+    pub binding: TransactionBinding<'a>,
+}
+
+/// Binding decision for a mutating operation using a transaction fd.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum TransactionMutationBindingPlan<'a> {
+    BindNew(TransactionBinding<'a>),
+    UseExisting(TransactionBinding<'a>),
+}
+
+/// Accepted transaction mutation with its globally allocated sequence number.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct TransactionMutationAcceptancePlan<'a> {
+    pub binding: TransactionMutationBindingPlan<'a>,
+    pub sequence: u64,
+    pub sequence_assigned_at_acceptance: bool,
+    pub commit_reuses_assigned_sequence: bool,
+    pub abort_leaves_sequence_gap: bool,
+}
+
+/// Transaction mutation-log entry class.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum TransactionMutationLogKind {
+    SetSecurity,
+    SetValue,
+    DeleteValue,
+    BlanketTombstone,
+    CreateKey,
+    DeleteKey,
+    HideKey,
+}
+
+/// Transaction mutation-log entry for kernel-owned commit effects.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct TransactionMutationLogEntry<'a> {
+    pub operation_index: TransactionOperationIndex,
+    pub kind: TransactionMutationLogKind,
+    pub watch_mutation: WatchMutationContext<'a>,
+    pub update_hive_generation_on_commit: bool,
+    pub update_last_write_time_on_commit: bool,
+}
+
+/// Failure while accepting a mutating operation into a transaction.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum TransactionMutationAcceptanceFailure {
+    TransactionUse(TransactionUseFailure),
+    Sequence(LcsError),
+}
+
+/// Read context selected for a read ioctl with an optional transaction fd.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum TransactionReadPlan<'a> {
+    NonTransactional,
+    Transactional(TransactionBinding<'a>),
+}
+
+/// Transaction lifetime event that determines mutation-log side effects.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum TransactionCompletionEvent {
+    CommitSucceeded,
+    ExplicitAbort,
+    TimeoutBeforeCommitDispatch,
+    SourceDownCancellation,
+    CommitRequestTimedOutAfterDispatch,
+    LateCommitSucceeded,
+    LateCommitFailed,
+    SourceConnectionTornDownAfterCommitTimeout,
+}
+
+/// Kernel-owned transaction mutation-log disposition.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum TransactionKernelEffectsPlan {
+    ApplyMutationLogAndEmitCommitEffects,
+    DiscardMutationLogWithoutEvents,
+    RetainMutationLogForOpenTransaction,
+    RetainMutationLogForLateResponse,
+}
+
+/// Synchronous source response to an in-flight REG_IOC_COMMIT request.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum TransactionCommitSourceResponse {
+    Committed,
+    SourceBusy,
+    SourceFailed,
+}
+
+/// Caller-visible result class for a synchronous REG_IOC_COMMIT source response.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum TransactionCommitReturnStatus {
+    Success,
+    Busy,
+    Io,
+}
+
+/// Planned transaction object effects for a synchronous source commit response.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct TransactionCommitResponsePlan<'a> {
+    pub final_state: TransactionState<'a>,
+    pub state_changed: bool,
+    pub wake_poll_waiters: bool,
+    pub return_status: TransactionCommitReturnStatus,
+    pub kernel_effects: TransactionKernelEffectsPlan,
+}
+
+/// Monotonic non-zero transaction ID allocator.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct TransactionIdCounter {
+    next_id: TransactionId,
+}
+
+/// Monotonic non-zero transaction mutation operation-index allocator.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct TransactionOperationIndexCounter {
+    next_index: TransactionOperationIndex,
+}
+
+impl TransactionIdCounter {
+    pub const fn new() -> Self {
+        Self { next_id: 1 }
+    }
+
+    pub fn from_next_id(next_id: TransactionId) -> LcsResult<Self> {
+        if next_id == 0 {
+            return Err(LcsError::InvalidTransactionId);
+        }
+        Ok(Self { next_id })
+    }
+
+    pub const fn next_id(&self) -> TransactionId {
+        self.next_id
+    }
+
+    pub fn allocate(&mut self) -> LcsResult<TransactionId> {
+        if self.next_id == TransactionId::MAX {
+            return Err(LcsError::TransactionIdOverflow);
+        }
+        let allocated = self.next_id;
+        self.next_id += 1;
+        Ok(allocated)
+    }
+}
+
+impl Default for TransactionIdCounter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl TransactionOperationIndexCounter {
+    pub const fn new() -> Self {
+        Self { next_index: 1 }
+    }
+
+    pub fn from_next_index(next_index: TransactionOperationIndex) -> LcsResult<Self> {
+        if next_index == 0 {
+            return Err(LcsError::InvalidTransactionOperationIndex);
+        }
+        Ok(Self { next_index })
+    }
+
+    pub const fn next_index(&self) -> TransactionOperationIndex {
+        self.next_index
+    }
+
+    pub fn allocate(&mut self) -> LcsResult<TransactionOperationIndex> {
+        if self.next_index == TransactionOperationIndex::MAX {
+            return Err(LcsError::TransactionOperationIndexOverflow);
+        }
+        let allocated = self.next_index;
+        self.next_index += 1;
+        Ok(allocated)
+    }
+}
+
+impl Default for TransactionOperationIndexCounter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Planned result of reg_begin_transaction before anonymous fd publication.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct StartedTransaction {
+    pub transaction_id: TransactionId,
+    pub state: TransactionState<'static>,
+    pub timeout_ms: u32,
+    pub start_timeout_timer: bool,
+}
+
+/// Planned transaction fd publication for `reg_begin_transaction`.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct TransactionFdPublicationPlan {
+    pub transaction_id: TransactionId,
+    pub initial_state: TransactionState<'static>,
+    pub timeout_ms: u32,
+    pub publish_anonymous_fd: bool,
+    pub start_timeout_timer: bool,
+    pub source_contact_required: bool,
+    pub close_without_commit_aborts: bool,
+}
+
+/// Planned cleanup when a transaction fd is closed by normal Linux fd teardown.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct TransactionFdClosePlan<'a> {
+    pub final_state: TransactionState<'a>,
+    pub binding: Option<TransactionBinding<'a>>,
+    pub dispatch_source_abort: bool,
+    pub discard_mutation_log: bool,
+    pub wake_poll_waiters: bool,
+    pub release_fd_object: bool,
+}
+
+/// Planned effects when a transaction runtime event changes or observes state.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct TransactionRuntimeTransitionPlan<'a> {
+    pub final_state: TransactionState<'a>,
+    pub binding: Option<TransactionBinding<'a>>,
+    pub state_changed: bool,
+    pub wake_poll_waiters: bool,
+    pub fd_remains_present: bool,
+    pub future_operation_failure: Option<TransactionUseFailure>,
+    pub dispatch_source_abort: bool,
+    pub kernel_effects: Option<TransactionKernelEffectsPlan>,
+}
+
+/// Per-source bound-transaction counter mutation selected by live state code.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum TransactionBoundCounterUpdate {
+    NoChange,
+    Increment,
+    Decrement,
+}
+
+/// Planned per-source bound-transaction counter result.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct TransactionBoundCounterPlan {
+    pub update: TransactionBoundCounterUpdate,
+    pub previous_count: usize,
+    pub next_count: usize,
+}
+
+/// Planned counter mutation selected from a transaction state transition.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct TransactionBoundCounterTransitionPlan<'a> {
+    pub affected_binding: Option<TransactionBinding<'a>>,
+    pub counter: TransactionBoundCounterPlan,
+}
+
+/// Per-source read-only snapshot transaction counter mutation.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ReadOnlySnapshotCounterUpdate {
+    NoChange,
+    Increment,
+    Decrement,
+}
+
+/// Planned per-source read-only snapshot transaction counter result.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct ReadOnlySnapshotCounterPlan {
+    pub update: ReadOnlySnapshotCounterUpdate,
+    pub previous_count: usize,
+    pub next_count: usize,
+}
+
+/// Planned admission for REG_IOC_BACKUP's read-only source transaction.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct BackupReadOnlySnapshotAdmissionPlan {
+    pub transaction_id: TransactionId,
+    pub source_transaction_mode: u32,
+    pub dispatch_begin_transaction: bool,
+    pub release_with_abort_transaction: bool,
+    pub dispatch_commit_transaction: bool,
+    pub affects_bound_transaction_counter: bool,
+    pub counter: ReadOnlySnapshotCounterPlan,
+}
+
+/// Reason a reserved read-only backup snapshot slot is being released.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum BackupReadOnlySnapshotReleaseReason {
+    SourceBeginFailed,
+    BackupCompleted,
+    BackupFailed,
+    SourceConnectionTornDown,
+}
+
+/// Planned release for a REG_IOC_BACKUP read-only source transaction reservation.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct BackupReadOnlySnapshotReleasePlan {
+    pub reason: BackupReadOnlySnapshotReleaseReason,
+    pub dispatch_abort_transaction: bool,
+    pub dispatch_commit_transaction: bool,
+    pub affects_bound_transaction_counter: bool,
+    pub counter: ReadOnlySnapshotCounterPlan,
+}
+
+/// Plans reg_begin_transaction without selecting a source.
+pub fn plan_begin_transaction(
+    limits: &LcsLimits,
+    counter: &mut TransactionIdCounter,
+) -> LcsResult<StartedTransaction> {
+    Ok(StartedTransaction {
+        transaction_id: counter.allocate()?,
+        state: TransactionState::ActiveUnbound,
+        timeout_ms: limits.transaction_timeout_ms,
+        start_timeout_timer: true,
+    })
+}
+
+/// Plans the full semantic fd publication result of `reg_begin_transaction`.
+pub fn plan_begin_transaction_fd(
+    limits: &LcsLimits,
+    counter: &mut TransactionIdCounter,
+) -> LcsResult<TransactionFdPublicationPlan> {
+    let started = plan_begin_transaction(limits, counter)?;
+    Ok(TransactionFdPublicationPlan {
+        transaction_id: started.transaction_id,
+        initial_state: started.state,
+        timeout_ms: started.timeout_ms,
+        publish_anonymous_fd: true,
+        start_timeout_timer: started.start_timeout_timer,
+        source_contact_required: false,
+        close_without_commit_aborts: true,
+    })
+}
+
+/// Plans REG_IOC_BACKUP admission before dispatching RSI_BEGIN_TRANSACTION.
+pub fn plan_backup_read_only_snapshot_admission(
+    limits: &LcsLimits,
+    counter: &mut TransactionIdCounter,
+    current_read_only_transactions_for_source: usize,
+) -> LcsResult<BackupReadOnlySnapshotAdmissionPlan> {
+    let counter_plan = plan_read_only_snapshot_counter_update(
+        limits,
+        current_read_only_transactions_for_source,
+        ReadOnlySnapshotCounterUpdate::Increment,
+    )?;
+    Ok(BackupReadOnlySnapshotAdmissionPlan {
+        transaction_id: counter.allocate()?,
+        source_transaction_mode: RSI_TXN_READ_ONLY,
+        dispatch_begin_transaction: true,
+        release_with_abort_transaction: true,
+        dispatch_commit_transaction: false,
+        affects_bound_transaction_counter: false,
+        counter: counter_plan,
+    })
+}
+
+/// Plans REG_IOC_BACKUP read-only snapshot reservation release.
+pub fn plan_backup_read_only_snapshot_release(
+    limits: &LcsLimits,
+    current_read_only_transactions_for_source: usize,
+    reason: BackupReadOnlySnapshotReleaseReason,
+) -> LcsResult<BackupReadOnlySnapshotReleasePlan> {
+    let counter_plan = plan_read_only_snapshot_counter_update(
+        limits,
+        current_read_only_transactions_for_source,
+        ReadOnlySnapshotCounterUpdate::Decrement,
+    )?;
+    Ok(BackupReadOnlySnapshotReleasePlan {
+        reason,
+        dispatch_abort_transaction: matches!(
+            reason,
+            BackupReadOnlySnapshotReleaseReason::BackupCompleted
+                | BackupReadOnlySnapshotReleaseReason::BackupFailed
+        ),
+        dispatch_commit_transaction: false,
+        affects_bound_transaction_counter: false,
+        counter: counter_plan,
+    })
+}
+
+/// Plans transaction-fd release side effects for close(), close-on-exec, or process exit.
+pub fn plan_transaction_fd_close<'a>(
+    limits: &LcsLimits,
+    state: TransactionState<'a>,
+) -> LcsResult<TransactionFdClosePlan<'a>> {
+    match state {
+        TransactionState::ActiveUnbound => Ok(TransactionFdClosePlan {
+            final_state: TransactionState::Aborted,
+            binding: None,
+            dispatch_source_abort: false,
+            discard_mutation_log: true,
+            wake_poll_waiters: true,
+            release_fd_object: true,
+        }),
+        TransactionState::ActiveBound(binding) => {
+            validate_transaction_binding(limits, binding)?;
+            Ok(TransactionFdClosePlan {
+                final_state: TransactionState::Aborted,
+                binding: Some(binding),
+                dispatch_source_abort: true,
+                discard_mutation_log: true,
+                wake_poll_waiters: true,
+                release_fd_object: true,
+            })
+        }
+        terminal @ (TransactionState::Committed
+        | TransactionState::Aborted
+        | TransactionState::TimedOut
+        | TransactionState::SourceDown) => Ok(TransactionFdClosePlan {
+            final_state: terminal,
+            binding: None,
+            dispatch_source_abort: false,
+            discard_mutation_log: false,
+            wake_poll_waiters: false,
+            release_fd_object: true,
+        }),
+    }
+}
+
+/// Shapes the REG_IOC_TXN_STATUS output payload from stored state.
+pub fn transaction_status(state: TransactionState<'_>) -> TransactionStatusResult {
+    match state {
+        TransactionState::ActiveUnbound => TransactionStatusResult {
+            state_code: REG_TXN_ACTIVE_UNBOUND,
+            terminal_errno: TransactionTerminalErrno::None,
+        },
+        TransactionState::ActiveBound(_) => TransactionStatusResult {
+            state_code: REG_TXN_ACTIVE_BOUND,
+            terminal_errno: TransactionTerminalErrno::None,
+        },
+        TransactionState::Committed => TransactionStatusResult {
+            state_code: REG_TXN_COMMITTED,
+            terminal_errno: TransactionTerminalErrno::None,
+        },
+        TransactionState::Aborted => TransactionStatusResult {
+            state_code: REG_TXN_ABORTED,
+            terminal_errno: TransactionTerminalErrno::Invalid,
+        },
+        TransactionState::TimedOut => TransactionStatusResult {
+            state_code: REG_TXN_TIMED_OUT,
+            terminal_errno: TransactionTerminalErrno::TimedOut,
+        },
+        TransactionState::SourceDown => TransactionStatusResult {
+            state_code: REG_TXN_SOURCE_DOWN,
+            terminal_errno: TransactionTerminalErrno::Io,
+        },
+    }
+}
+
+/// Returns the failure future read/mutating operations must report for a state.
+pub fn transaction_terminal_failure(state: TransactionState<'_>) -> Option<TransactionUseFailure> {
+    match state {
+        TransactionState::ActiveUnbound | TransactionState::ActiveBound(_) => None,
+        TransactionState::Committed | TransactionState::Aborted => {
+            Some(TransactionUseFailure::Invalid)
+        }
+        TransactionState::TimedOut => Some(TransactionUseFailure::TimedOut),
+        TransactionState::SourceDown => Some(TransactionUseFailure::SourceDown),
+    }
+}
+
+/// Maps transaction timeout use failures to their caller-visible errno class.
+pub fn transaction_timeout_errno(
+    failure: TransactionUseFailure,
+) -> Option<TransactionTimeoutErrno> {
+    match failure {
+        TransactionUseFailure::TimedOut => Some(TransactionTimeoutErrno::Etimedout),
+        TransactionUseFailure::Invalid
+        | TransactionUseFailure::SourceDown
+        | TransactionUseFailure::CrossHive
+        | TransactionUseFailure::Busy
+        | TransactionUseFailure::NotSupported => None,
+    }
+}
+
+/// Maps transaction-use failures to their caller-visible errno class.
+pub fn transaction_use_failure_errno(failure: TransactionUseFailure) -> RsiMappedErrno {
+    match failure {
+        TransactionUseFailure::Invalid => RsiMappedErrno::Einval,
+        TransactionUseFailure::TimedOut => RsiMappedErrno::Etimedout,
+        TransactionUseFailure::SourceDown => RsiMappedErrno::Eio,
+        TransactionUseFailure::CrossHive => RsiMappedErrno::Exdev,
+        TransactionUseFailure::Busy => RsiMappedErrno::Ebusy,
+        TransactionUseFailure::NotSupported => RsiMappedErrno::Enotsup,
+    }
+}
+
+/// Projects transaction-use failures to Linux errno.
+pub fn transaction_use_failure_linux_errno(failure: TransactionUseFailure) -> LinuxErrno {
+    LinuxErrno::from(transaction_use_failure_errno(failure))
+}
+
+/// Plans transaction-fd poll readiness from the transaction state.
+pub fn plan_transaction_poll(state: TransactionState<'_>) -> TransactionPollPlan {
+    match state {
+        TransactionState::ActiveUnbound | TransactionState::ActiveBound(_) => TransactionPollPlan {
+            readable: false,
+            writable: false,
+            hangup: false,
+            error: false,
+        },
+        TransactionState::Committed
+        | TransactionState::Aborted
+        | TransactionState::TimedOut
+        | TransactionState::SourceDown => TransactionPollPlan {
+            readable: false,
+            writable: false,
+            hangup: true,
+            error: true,
+        },
+    }
+}
+
+/// Projects symbolic transaction-fd poll readiness to Linux poll mask bits.
+pub fn transaction_poll_plan_mask(plan: TransactionPollPlan) -> u16 {
+    linux_poll_mask_from_readiness(plan.readable, plan.writable, plan.hangup, plan.error)
+}
+
+/// Plans the Linux poll mask returned by a transaction fd poll hook.
+pub fn plan_transaction_poll_mask(state: TransactionState<'_>) -> u16 {
+    transaction_poll_plan_mask(plan_transaction_poll(state))
+}
+
+/// Prechecks REG_IOC_COMMIT before dispatching to the bound source.
+pub fn plan_transaction_commit(
+    state: TransactionState<'_>,
+) -> Result<TransactionCommitPlan<'_>, TransactionUseFailure> {
+    match state {
+        TransactionState::ActiveBound(binding) => Ok(TransactionCommitPlan { binding }),
+        TransactionState::TimedOut => Err(TransactionUseFailure::TimedOut),
+        TransactionState::SourceDown => Err(TransactionUseFailure::SourceDown),
+        TransactionState::ActiveUnbound
+        | TransactionState::Committed
+        | TransactionState::Aborted => Err(TransactionUseFailure::Invalid),
+    }
+}
+
+/// Plans first-bind or existing-bind behavior for transactional mutations.
+pub fn plan_transaction_mutation_binding<'a>(
+    limits: &LcsLimits,
+    state: TransactionState<'a>,
+    target: TransactionBinding<'a>,
+    source_supports_transactions: bool,
+    current_bound_transactions_for_source: usize,
+) -> Result<TransactionMutationBindingPlan<'a>, TransactionUseFailure> {
+    validate_transaction_binding(limits, target).map_err(|_| TransactionUseFailure::Invalid)?;
+    match state {
+        TransactionState::ActiveUnbound => {
+            if !source_supports_transactions {
+                return Err(TransactionUseFailure::NotSupported);
+            }
+            if current_bound_transactions_for_source >= limits.max_bound_transactions_per_source {
+                return Err(TransactionUseFailure::Busy);
+            }
+            Ok(TransactionMutationBindingPlan::BindNew(target))
+        }
+        TransactionState::ActiveBound(existing) => {
+            if same_transaction_binding(limits, existing, target)
+                .map_err(|_| TransactionUseFailure::Invalid)?
+            {
+                Ok(TransactionMutationBindingPlan::UseExisting(existing))
+            } else {
+                Err(TransactionUseFailure::CrossHive)
+            }
+        }
+        TransactionState::Committed | TransactionState::Aborted => {
+            Err(TransactionUseFailure::Invalid)
+        }
+        TransactionState::TimedOut => Err(TransactionUseFailure::TimedOut),
+        TransactionState::SourceDown => Err(TransactionUseFailure::SourceDown),
+    }
+}
+
+/// Plans acceptance of a mutating operation into a transaction and assigns its
+/// resolution sequence before commit-time source dispatch.
+pub fn plan_transaction_mutation_acceptance<'a>(
+    limits: &LcsLimits,
+    state: TransactionState<'a>,
+    target: TransactionBinding<'a>,
+    source_supports_transactions: bool,
+    current_bound_transactions_for_source: usize,
+    sequence_counter: &mut SequenceCounter,
+) -> Result<TransactionMutationAcceptancePlan<'a>, TransactionMutationAcceptanceFailure> {
+    let binding = plan_transaction_mutation_binding(
+        limits,
+        state,
+        target,
+        source_supports_transactions,
+        current_bound_transactions_for_source,
+    )
+    .map_err(TransactionMutationAcceptanceFailure::TransactionUse)?;
+    let sequence = sequence_counter
+        .allocate()
+        .map_err(TransactionMutationAcceptanceFailure::Sequence)?;
+
+    Ok(TransactionMutationAcceptancePlan {
+        binding,
+        sequence,
+        sequence_assigned_at_acceptance: true,
+        commit_reuses_assigned_sequence: true,
+        abort_leaves_sequence_gap: true,
+    })
+}
+
+/// Plans one transaction mutation-log entry before source dispatch.
+pub fn plan_transaction_mutation_log_entry<'a>(
+    counter: &mut TransactionOperationIndexCounter,
+    kind: TransactionMutationLogKind,
+    watch_mutation: WatchMutationContext<'a>,
+    update_hive_generation_on_commit: bool,
+    update_last_write_time_on_commit: bool,
+) -> LcsResult<TransactionMutationLogEntry<'a>> {
+    validate_transaction_mutation_log_kind(kind, watch_mutation)?;
+    validate_watch_mutation_context(&watch_mutation)?;
+
+    Ok(TransactionMutationLogEntry {
+        operation_index: counter.allocate()?,
+        kind,
+        watch_mutation,
+        update_hive_generation_on_commit,
+        update_last_write_time_on_commit,
+    })
+}
+
+/// Converts one committed mutation-log entry to an existing per-watcher batch member.
+pub fn transaction_log_entry_watch_batch_member(
+    entry: &TransactionMutationLogEntry<'_>,
+    event_count: usize,
+) -> TransactionWatchBatchMember {
+    TransactionWatchBatchMember {
+        operation_index: entry.operation_index,
+        event_count,
+    }
+}
+
+/// Plans read behavior when a read ioctl is supplied a transaction fd.
+pub fn plan_transaction_read<'a>(
+    limits: &LcsLimits,
+    state: TransactionState<'a>,
+    target: TransactionBinding<'a>,
+) -> Result<TransactionReadPlan<'a>, TransactionUseFailure> {
+    validate_transaction_binding(limits, target).map_err(|_| TransactionUseFailure::Invalid)?;
+    match state {
+        TransactionState::ActiveUnbound => Ok(TransactionReadPlan::NonTransactional),
+        TransactionState::ActiveBound(existing) => {
+            if same_transaction_binding(limits, existing, target)
+                .map_err(|_| TransactionUseFailure::Invalid)?
+            {
+                Ok(TransactionReadPlan::Transactional(existing))
+            } else {
+                Err(TransactionUseFailure::CrossHive)
+            }
+        }
+        TransactionState::Committed | TransactionState::Aborted => {
+            Err(TransactionUseFailure::Invalid)
+        }
+        TransactionState::TimedOut => Err(TransactionUseFailure::TimedOut),
+        TransactionState::SourceDown => Err(TransactionUseFailure::SourceDown),
+    }
+}
+
+/// Plans transaction mutation-log effects after a terminal or pending commit event.
+pub fn plan_transaction_completion_effects(
+    event: TransactionCompletionEvent,
+) -> TransactionKernelEffectsPlan {
+    match event {
+        TransactionCompletionEvent::CommitSucceeded
+        | TransactionCompletionEvent::LateCommitSucceeded => {
+            TransactionKernelEffectsPlan::ApplyMutationLogAndEmitCommitEffects
+        }
+        TransactionCompletionEvent::CommitRequestTimedOutAfterDispatch => {
+            TransactionKernelEffectsPlan::RetainMutationLogForLateResponse
+        }
+        TransactionCompletionEvent::ExplicitAbort
+        | TransactionCompletionEvent::TimeoutBeforeCommitDispatch
+        | TransactionCompletionEvent::SourceDownCancellation
+        | TransactionCompletionEvent::LateCommitFailed
+        | TransactionCompletionEvent::SourceConnectionTornDownAfterCommitTimeout => {
+            TransactionKernelEffectsPlan::DiscardMutationLogWithoutEvents
+        }
+    }
+}
+
+/// Plans the synchronous response path for REG_IOC_COMMIT after source dispatch.
+pub fn plan_transaction_commit_response<'a>(
+    limits: &LcsLimits,
+    state: TransactionState<'a>,
+    response: TransactionCommitSourceResponse,
+) -> LcsResult<TransactionCommitResponsePlan<'a>> {
+    let TransactionState::ActiveBound(binding) = state else {
+        return Err(LcsError::InvalidTransactionRuntimeState);
+    };
+    validate_transaction_binding(limits, binding)?;
+
+    match response {
+        TransactionCommitSourceResponse::Committed => Ok(TransactionCommitResponsePlan {
+            final_state: TransactionState::Committed,
+            state_changed: true,
+            wake_poll_waiters: true,
+            return_status: TransactionCommitReturnStatus::Success,
+            kernel_effects: TransactionKernelEffectsPlan::ApplyMutationLogAndEmitCommitEffects,
+        }),
+        TransactionCommitSourceResponse::SourceBusy => Ok(TransactionCommitResponsePlan {
+            final_state: TransactionState::ActiveBound(binding),
+            state_changed: false,
+            wake_poll_waiters: false,
+            return_status: TransactionCommitReturnStatus::Busy,
+            kernel_effects: TransactionKernelEffectsPlan::RetainMutationLogForOpenTransaction,
+        }),
+        TransactionCommitSourceResponse::SourceFailed => Ok(TransactionCommitResponsePlan {
+            final_state: TransactionState::ActiveBound(binding),
+            state_changed: false,
+            wake_poll_waiters: false,
+            return_status: TransactionCommitReturnStatus::Io,
+            kernel_effects: TransactionKernelEffectsPlan::RetainMutationLogForOpenTransaction,
+        }),
+    }
+}
+
+/// Plans the transaction lifetime timer firing for an active or terminal fd object.
+pub fn plan_transaction_timeout<'a>(
+    limits: &LcsLimits,
+    state: TransactionState<'a>,
+    commit_in_flight: bool,
+) -> LcsResult<TransactionRuntimeTransitionPlan<'a>> {
+    match state {
+        TransactionState::ActiveUnbound => {
+            if commit_in_flight {
+                return Err(LcsError::InvalidTransactionRuntimeState);
+            }
+            Ok(TransactionRuntimeTransitionPlan {
+                final_state: TransactionState::TimedOut,
+                binding: None,
+                state_changed: true,
+                wake_poll_waiters: true,
+                fd_remains_present: true,
+                future_operation_failure: Some(TransactionUseFailure::TimedOut),
+                dispatch_source_abort: false,
+                kernel_effects: Some(plan_transaction_completion_effects(
+                    TransactionCompletionEvent::TimeoutBeforeCommitDispatch,
+                )),
+            })
+        }
+        TransactionState::ActiveBound(binding) => {
+            validate_transaction_binding(limits, binding)?;
+            Ok(TransactionRuntimeTransitionPlan {
+                final_state: TransactionState::TimedOut,
+                binding: Some(binding),
+                state_changed: true,
+                wake_poll_waiters: true,
+                fd_remains_present: true,
+                future_operation_failure: Some(TransactionUseFailure::TimedOut),
+                dispatch_source_abort: !commit_in_flight,
+                kernel_effects: Some(plan_transaction_completion_effects(if commit_in_flight {
+                    TransactionCompletionEvent::CommitRequestTimedOutAfterDispatch
+                } else {
+                    TransactionCompletionEvent::TimeoutBeforeCommitDispatch
+                })),
+            })
+        }
+        terminal @ (TransactionState::Committed
+        | TransactionState::Aborted
+        | TransactionState::TimedOut
+        | TransactionState::SourceDown) => Ok(TransactionRuntimeTransitionPlan {
+            final_state: terminal,
+            binding: None,
+            state_changed: false,
+            wake_poll_waiters: false,
+            fd_remains_present: true,
+            future_operation_failure: transaction_terminal_failure(terminal),
+            dispatch_source_abort: false,
+            kernel_effects: None,
+        }),
+    }
+}
+
+/// Plans the transition for a transaction already bound to a source that went Down.
+pub fn plan_transaction_bound_source_down<'a>(
+    limits: &LcsLimits,
+    state: TransactionState<'a>,
+) -> LcsResult<TransactionRuntimeTransitionPlan<'a>> {
+    match state {
+        TransactionState::ActiveBound(binding) => {
+            validate_transaction_binding(limits, binding)?;
+            Ok(TransactionRuntimeTransitionPlan {
+                final_state: TransactionState::SourceDown,
+                binding: Some(binding),
+                state_changed: true,
+                wake_poll_waiters: true,
+                fd_remains_present: true,
+                future_operation_failure: Some(TransactionUseFailure::SourceDown),
+                dispatch_source_abort: false,
+                kernel_effects: Some(plan_transaction_completion_effects(
+                    TransactionCompletionEvent::SourceDownCancellation,
+                )),
+            })
+        }
+        TransactionState::ActiveUnbound => Ok(TransactionRuntimeTransitionPlan {
+            final_state: TransactionState::ActiveUnbound,
+            binding: None,
+            state_changed: false,
+            wake_poll_waiters: false,
+            fd_remains_present: true,
+            future_operation_failure: None,
+            dispatch_source_abort: false,
+            kernel_effects: None,
+        }),
+        terminal @ (TransactionState::Committed
+        | TransactionState::Aborted
+        | TransactionState::TimedOut
+        | TransactionState::SourceDown) => Ok(TransactionRuntimeTransitionPlan {
+            final_state: terminal,
+            binding: None,
+            state_changed: false,
+            wake_poll_waiters: false,
+            fd_remains_present: true,
+            future_operation_failure: transaction_terminal_failure(terminal),
+            dispatch_source_abort: false,
+            kernel_effects: None,
+        }),
+    }
+}
+
+/// Plans mutation of the per-source count of currently bound transactions.
+pub fn plan_transaction_bound_counter_update(
+    limits: &LcsLimits,
+    current_bound_transactions_for_source: usize,
+    update: TransactionBoundCounterUpdate,
+) -> LcsResult<TransactionBoundCounterPlan> {
+    match update {
+        TransactionBoundCounterUpdate::NoChange => Ok(TransactionBoundCounterPlan {
+            update,
+            previous_count: current_bound_transactions_for_source,
+            next_count: current_bound_transactions_for_source,
+        }),
+        TransactionBoundCounterUpdate::Increment => {
+            if current_bound_transactions_for_source >= limits.max_bound_transactions_per_source {
+                return Err(LcsError::InvalidTransactionRuntimeState);
+            }
+            Ok(TransactionBoundCounterPlan {
+                update,
+                previous_count: current_bound_transactions_for_source,
+                next_count: current_bound_transactions_for_source + 1,
+            })
+        }
+        TransactionBoundCounterUpdate::Decrement => {
+            let next_count = current_bound_transactions_for_source
+                .checked_sub(1)
+                .ok_or(LcsError::InvalidTransactionRuntimeState)?;
+            Ok(TransactionBoundCounterPlan {
+                update,
+                previous_count: current_bound_transactions_for_source,
+                next_count,
+            })
+        }
+    }
+}
+
+/// Plans mutation of the per-source count of read-only backup snapshot transactions.
+pub fn plan_read_only_snapshot_counter_update(
+    limits: &LcsLimits,
+    current_read_only_transactions_for_source: usize,
+    update: ReadOnlySnapshotCounterUpdate,
+) -> LcsResult<ReadOnlySnapshotCounterPlan> {
+    match update {
+        ReadOnlySnapshotCounterUpdate::NoChange => Ok(ReadOnlySnapshotCounterPlan {
+            update,
+            previous_count: current_read_only_transactions_for_source,
+            next_count: current_read_only_transactions_for_source,
+        }),
+        ReadOnlySnapshotCounterUpdate::Increment => {
+            if current_read_only_transactions_for_source
+                >= limits.max_read_only_transactions_per_source
+            {
+                return Err(LcsError::TooManyReadOnlyTransactions {
+                    count: current_read_only_transactions_for_source,
+                    max: limits.max_read_only_transactions_per_source,
+                });
+            }
+            Ok(ReadOnlySnapshotCounterPlan {
+                update,
+                previous_count: current_read_only_transactions_for_source,
+                next_count: current_read_only_transactions_for_source + 1,
+            })
+        }
+        ReadOnlySnapshotCounterUpdate::Decrement => {
+            let next_count = current_read_only_transactions_for_source
+                .checked_sub(1)
+                .ok_or(LcsError::InvalidTransactionRuntimeState)?;
+            Ok(ReadOnlySnapshotCounterPlan {
+                update,
+                previous_count: current_read_only_transactions_for_source,
+                next_count,
+            })
+        }
+    }
+}
+
+/// Selects the per-source bound-transaction counter update for a state transition.
+pub fn plan_transaction_bound_counter_transition<'a>(
+    limits: &LcsLimits,
+    previous_state: TransactionState<'a>,
+    next_state: TransactionState<'a>,
+    current_bound_transactions_for_source: usize,
+) -> LcsResult<TransactionBoundCounterTransitionPlan<'a>> {
+    let (affected_binding, update) = match (previous_state, next_state) {
+        (TransactionState::ActiveUnbound, TransactionState::ActiveUnbound) => {
+            (None, TransactionBoundCounterUpdate::NoChange)
+        }
+        (TransactionState::ActiveUnbound, TransactionState::ActiveBound(next)) => {
+            validate_transaction_binding(limits, next)?;
+            (Some(next), TransactionBoundCounterUpdate::Increment)
+        }
+        (TransactionState::ActiveUnbound, next) if is_terminal_transaction_state(next) => {
+            (None, TransactionBoundCounterUpdate::NoChange)
+        }
+        (TransactionState::ActiveBound(previous), TransactionState::ActiveBound(next)) => {
+            if !same_transaction_binding(limits, previous, next)? {
+                return Err(LcsError::InvalidTransactionRuntimeState);
+            }
+            (Some(previous), TransactionBoundCounterUpdate::NoChange)
+        }
+        (TransactionState::ActiveBound(previous), next) if is_terminal_transaction_state(next) => {
+            validate_transaction_binding(limits, previous)?;
+            (Some(previous), TransactionBoundCounterUpdate::Decrement)
+        }
+        (previous, next)
+            if is_terminal_transaction_state(previous)
+                && is_terminal_transaction_state(next)
+                && previous == next =>
+        {
+            (None, TransactionBoundCounterUpdate::NoChange)
+        }
+        _ => return Err(LcsError::InvalidTransactionRuntimeState),
+    };
+
+    Ok(TransactionBoundCounterTransitionPlan {
+        affected_binding,
+        counter: plan_transaction_bound_counter_update(
+            limits,
+            current_bound_transactions_for_source,
+            update,
+        )?,
+    })
+}
+
+fn validate_transaction_binding(
+    limits: &LcsLimits,
+    binding: TransactionBinding<'_>,
+) -> LcsResult<()> {
+    validate_hive_name_bytes(binding.hive_name.as_bytes(), limits)?;
+    if binding.hive_root_guid == NIL_GUID {
+        return Err(LcsError::NilHiveRootGuid);
+    }
+    Ok(())
+}
+
+fn same_transaction_binding(
+    limits: &LcsLimits,
+    left: TransactionBinding<'_>,
+    right: TransactionBinding<'_>,
+) -> LcsResult<bool> {
+    validate_transaction_binding(limits, left)?;
+    validate_transaction_binding(limits, right)?;
+    Ok(left.source_id == right.source_id
+        && left.hive_root_guid == right.hive_root_guid
+        && casefold_eq(left.hive_name, right.hive_name))
+}
+
+fn validate_transaction_mutation_log_kind(
+    kind: TransactionMutationLogKind,
+    watch_mutation: WatchMutationContext<'_>,
+) -> LcsResult<()> {
+    match kind {
+        TransactionMutationLogKind::SetSecurity => {
+            if watch_mutation.event_type != REG_WATCH_SD_CHANGED {
+                return Err(LcsError::InvalidTransactionMutationLogEntry {
+                    field: "event_type",
+                });
+            }
+        }
+        TransactionMutationLogKind::SetValue
+        | TransactionMutationLogKind::DeleteValue
+        | TransactionMutationLogKind::BlanketTombstone
+        | TransactionMutationLogKind::CreateKey
+        | TransactionMutationLogKind::DeleteKey
+        | TransactionMutationLogKind::HideKey => {
+            return Err(LcsError::InvalidTransactionMutationLogEntry { field: "kind" });
+        }
+    }
+    Ok(())
+}
+
+fn is_terminal_transaction_state(state: TransactionState<'_>) -> bool {
+    matches!(
+        state,
+        TransactionState::Committed
+            | TransactionState::Aborted
+            | TransactionState::TimedOut
+            | TransactionState::SourceDown
+    )
+}

@@ -1,0 +1,207 @@
+load("@rules_rust//rust:defs.bzl", "rust_library")
+load("//build:checks.bzl", "host_test", "source_inputs_manifest")
+load("//packages:package.bzl", "package_store")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files([
+    "Cargo.toml",
+    "Cargo.lock",
+])
+
+filegroup(
+    name = "sources",
+    srcs = glob(
+        [
+            "**",
+            ".github/**",
+        ],
+        allow_empty = True,
+        exclude = [
+            ".git",
+            ".git/**",
+            "**/.git",
+            "**/.git/**",
+            "bazel-*/**",
+            ".ci-*/**",
+            "**/.trail-cache/**",
+            "**/node_modules/**",
+            "**/.venv/**",
+            "**/.pytest_cache/**",
+            "**/.mypy_cache/**",
+            "**/.cache/**",
+            "docs/learn/dist/**",
+            "target/**",
+            "out/**",
+            "**/__pycache__/**",
+            "**/.ruff_cache/**",
+        ],
+    ) + [
+        "//build:sources",
+        "//libpeios:sources",
+        "//librsi:sources",
+        "//packages:sources",
+        "//peios-cabi:sources",
+        "//vendor/ppk:sources",
+    ],
+)
+
+filegroup(
+    name = "kernel-sources",
+    srcs = glob(["vendor/kernel/**"]),
+)
+
+filegroup(
+    name = "artifacts",
+    srcs = [
+        "//libpeios:shared",
+        "//libpeios:static",
+        "//librsi:shared",
+        "//librsi:static",
+    ],
+)
+
+rust_library(
+    name = "peios-uapi",
+    srcs = glob([
+        "vendor/kernel/peios/rust/peios-uapi/*.rs",
+    ]) + ["vendor/kernel/security/pkm/kacs/peios_uapi.rs"],
+    compile_data = ["vendor/kernel/peios/rust/peios-uapi/Cargo.toml"],
+    crate_name = "peios_uapi",
+    crate_root = "vendor/kernel/peios/rust/peios-uapi/lib.rs",
+    edition = "2021",
+    version = "0.1.0",
+    deps = [],
+)
+
+rust_library(
+    name = "kacs-core",
+    srcs = glob([
+        "vendor/kernel/peios/rust/kacs-core/*.rs",
+        "vendor/kernel/security/pkm/kacs/kacs_core/**/*.rs",
+    ]),
+    compile_data = ["vendor/kernel/peios/rust/kacs-core/Cargo.toml"],
+    crate_name = "kacs_core",
+    crate_root = "vendor/kernel/peios/rust/kacs-core/lib.rs",
+    edition = "2021",
+    version = "0.1.0",
+    deps = [":peios-uapi"],
+)
+
+rust_library(
+    name = "lcs-core",
+    srcs = glob([
+        "vendor/kernel/peios/rust/lcs-core/*.rs",
+        "vendor/kernel/security/pkm/lcs/lcs_core/**/*.rs",
+    ]),
+    compile_data = ["vendor/kernel/peios/rust/lcs-core/Cargo.toml"],
+    crate_name = "lcs_core",
+    crate_root = "vendor/kernel/peios/rust/lcs-core/lib.rs",
+    edition = "2021",
+    version = "0.1.0",
+    deps = [
+        ":kacs-core",
+        ":peios-uapi",
+    ],
+)
+
+filegroup(
+    name = "package-data",
+    srcs = [":sources"],
+)
+
+filegroup(
+    name = "package-sources",
+    srcs = [":sources"],
+)
+
+package_store(
+    name = "packages",
+    packages = ["//packages:all"],
+)
+
+filegroup(
+    name = "build-files",
+    srcs = glob(["*.bazel"]) + [
+        "//build:build-files",
+        "//libpeios:BUILD.bazel",
+        "//libpeios/static:BUILD.bazel",
+        "//librsi:BUILD.bazel",
+        "//librsi/static:BUILD.bazel",
+        "//packages:build-files",
+        "//peios-cabi:BUILD.bazel",
+    ],
+)
+
+genrule(
+    name = "build-format-check",
+    srcs = [":build-files"],
+    outs = ["build-format-check.stamp"],
+    cmd = "$(execpath @buildifier//file) -mode=check -lint=warn $(execpaths :build-files) && touch $@",
+    tools = ["@buildifier//file"],
+)
+
+host_test(
+    name = "abi-tool-test",
+    size = "small",
+    command = "exec python3 tools/test-verify-abi.py",
+    data = [
+        "tools/test-verify-abi.py",
+        "tools/verify-abi.py",
+    ],
+)
+
+host_test(
+    name = "vendor-test",
+    size = "small",
+    command = "exec python3 tools/test-bazel-vendor.py",
+    data = [
+        "tools/bazel-vendor.py",
+        "tools/test-bazel-vendor.py",
+    ],
+)
+
+host_test(
+    name = "kernel-inputs-test",
+    size = "small",
+    command = "exec python3 tools/test_update_kernel_inputs.py",
+    data = [
+        "tools/test_update_kernel_inputs.py",
+        "tools/update-kernel-inputs.py",
+    ],
+)
+
+host_test(
+    name = "kernel-inputs-check",
+    size = "small",
+    command = "exec python3 tools/update-kernel-inputs.py check --snapshot vendor/kernel --bazel-inputs",
+    data = [
+        "tools/update-kernel-inputs.py",
+        ":kernel-sources",
+    ],
+)
+
+source_inputs_manifest(
+    name = "source-inputs-manifest",
+    srcs = [":sources"],
+)
+
+host_test(
+    name = "source-inputs-check",
+    size = "small",
+    command = "exec python3 tools/check-source-inputs.py $(rootpath :source-inputs-manifest)",
+    data = [
+        "tools/check-source-inputs.py",
+        ":source-inputs-manifest",
+    ],
+)
+
+host_test(
+    name = "source-inputs-test",
+    size = "small",
+    command = "exec python3 tools/test-source-inputs.py",
+    data = [
+        "tools/check-source-inputs.py",
+        "tools/test-source-inputs.py",
+    ],
+)

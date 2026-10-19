@@ -1,0 +1,21 @@
+{
+    "package": {
+        "name": "dev.peios.libpeios-devel",
+        "version": "0.5.11-1",
+        "architecture": "x86_64",
+        "license": "MIT",
+        "license_class": "free",
+        "homepage": "https://github.com/peios/libpeios",
+        "description": "Headers and link metadata for libpeios"
+    },
+    "dependencies": {
+        "dev.peios.libpeios": "= 0.5.11-1",
+        "dev.peios.kernel-headers": ">= 0.20.1-rc13-1"
+    },
+    "files": {
+        "source:libpeios/LICENSE": "usr/share/licenses/dev.peios.libpeios-devel/LICENSE",
+        "stage:headers/libpeios/**": "usr/include",
+        "stage:usr/lib/x86_64-linux-peios/libpeios.so": "usr/lib/x86_64-linux-peios/libpeios.so",
+        "stage:usr/lib/x86_64-linux-peios/pkgconfig/peios.pc": "usr/lib/x86_64-linux-peios/pkgconfig/peios.pc"
+    }
+}

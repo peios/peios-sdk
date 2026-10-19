@@ -1,0 +1,17 @@
+{
+    "package": {
+        "name": "dev.peios.librsi",
+        "version": "0.5.11-1",
+        "architecture": "x86_64",
+        "license": "(Apache-2.0 OR MIT) AND MIT",
+        "license_class": "free",
+        "homepage": "https://github.com/peios/librsi",
+        "description": "Peios userspace rsi shared library"
+    },
+    "dependencies": {},
+    "files": {
+        "source:librsi/LICENSE": "usr/share/licenses/dev.peios.librsi/LICENSE",
+        "stage:licenses/librsi/**": "usr/share/licenses/dev.peios.librsi/third-party",
+        "stage:usr/lib/x86_64-linux-peios/librsi.so.0": "usr/lib/x86_64-linux-peios/librsi.so.0"
+    }
+}

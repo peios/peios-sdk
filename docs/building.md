@@ -31,6 +31,8 @@ The member test targets are `//libpeios:tests` and `//librsi:tests`.
 The `//libpeios:abi-test` and `//librsi:abi-test` targets check the exported
 interfaces. ABI verification requires cbindgen 0.29.2, GCC, G++, `nm`, and
 `readelf`; an absent generator is an error, not a skipped freshness check.
+GCC remains the C prototype checker. To use another C++ compiler explicitly,
+pass `--test_env=CXX=/path/to/clang++` to Bazel; the ABI checks report its identity.
 
 ## Style and repository checks
 
