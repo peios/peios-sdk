@@ -268,12 +268,21 @@ impl Ring {
     /// Implements the spec's notification-wait: arm `need_wake`, re-check
     /// `write_pos` to close the race, then `FUTEX_WAIT` on the counter.
     fn wait(&self, read_pos: u64, timeout_ms: c_int) -> Wait {
+        self.wait_until(timeout_ms, || self.write_pos() != read_pos)
+    }
+
+    /// Keep notification arming and the final ready check in one wait protocol.
+    /// The callback also permits deterministic testing of producer interleavings.
+    fn wait_until(&self, timeout_ms: c_int, ready: impl FnOnce() -> bool) -> Wait {
         self.set_need_wake(true);
-        if self.write_pos() != read_pos {
+        // Capture before the final condition check: a producer between that
+        // check and FUTEX_WAIT must change the expected counter, not become
+        // the value we sleep on after its wake has already happened.
+        let observed = self.futex_counter();
+        if ready() {
             self.set_need_wake(false);
             return Wait::Ready; // raced — events appeared
         }
-        let observed = self.futex_counter();
         let r = unsafe { futex_wait(self.futex_ptr(), observed, timeout_ms) };
         self.set_need_wake(false);
         if r == 0 {
@@ -488,6 +497,11 @@ pub unsafe extern "C" fn peios_event_ring_map(
 
 /// `peios_event_ring_unmap` — release a mapping (NULL-safe; idempotent fields are
 /// zeroed).
+///
+/// # Safety
+/// `ring` must be NULL or a live ring initialized by the ring API. The mapping must remain live
+/// throughout this call; unmapping requires exclusive access and invalidates borrowed event
+/// pointers.
 #[no_mangle]
 pub unsafe extern "C" fn peios_event_ring_unmap(ring: *mut peios_event_ring) {
     if let Some(ring) = ring.as_mut() {
@@ -499,6 +513,11 @@ pub unsafe extern "C" fn peios_event_ring_unmap(ring: *mut peios_event_ring) {
 }
 
 /// `peios_event_ring_capacity` — the data-region capacity in bytes.
+///
+/// # Safety
+/// `ring` must be NULL or a live ring initialized by the ring API. The mapping must remain live
+/// throughout this call; unmapping requires exclusive access and invalidates borrowed event
+/// pointers.
 #[no_mangle]
 pub unsafe extern "C" fn peios_event_ring_capacity(ring: *const peios_event_ring) -> u64 {
     match ring.as_ref() {
@@ -508,6 +527,11 @@ pub unsafe extern "C" fn peios_event_ring_capacity(ring: *const peios_event_ring
 }
 
 /// `peios_event_ring_write_pos` — the producer's write position (acquire load).
+///
+/// # Safety
+/// `ring` must be NULL or a live ring initialized by the ring API. The mapping must remain live
+/// throughout this call; unmapping requires exclusive access and invalidates borrowed event
+/// pointers.
 #[no_mangle]
 pub unsafe extern "C" fn peios_event_ring_write_pos(ring: *const peios_event_ring) -> u64 {
     match ring.as_ref() {
@@ -517,6 +541,11 @@ pub unsafe extern "C" fn peios_event_ring_write_pos(ring: *const peios_event_rin
 }
 
 /// `peios_event_ring_tail_pos` — the oldest surviving position (acquire load).
+///
+/// # Safety
+/// `ring` must be NULL or a live ring initialized by the ring API. The mapping must remain live
+/// throughout this call; unmapping requires exclusive access and invalidates borrowed event
+/// pointers.
 #[no_mangle]
 pub unsafe extern "C" fn peios_event_ring_tail_pos(ring: *const peios_event_ring) -> u64 {
     match ring.as_ref() {
@@ -526,6 +555,11 @@ pub unsafe extern "C" fn peios_event_ring_tail_pos(ring: *const peios_event_ring
 }
 
 /// `peios_event_ring_generation` — the buffer generation (bumped on resize).
+///
+/// # Safety
+/// `ring` must be NULL or a live ring initialized by the ring API. The mapping must remain live
+/// throughout this call; unmapping requires exclusive access and invalidates borrowed event
+/// pointers.
 #[no_mangle]
 pub unsafe extern "C" fn peios_event_ring_generation(ring: *const peios_event_ring) -> u64 {
     match ring.as_ref() {
@@ -536,6 +570,11 @@ pub unsafe extern "C" fn peios_event_ring_generation(ring: *const peios_event_ri
 
 /// `peios_event_ring_set_need_wake` — arm (`set != 0`) or clear the advisory
 /// wake flag.
+///
+/// # Safety
+/// `ring` must be NULL or a live ring initialized by the ring API. The mapping must remain live
+/// throughout this call; unmapping requires exclusive access and invalidates borrowed event
+/// pointers.
 #[no_mangle]
 pub unsafe extern "C" fn peios_event_ring_set_need_wake(ring: *const peios_event_ring, set: c_int) {
     if let Some(r) = ring.as_ref() {
@@ -706,6 +745,10 @@ impl peios_event_reader {
 /// `peios_event_reader_open` — attach to CPU `cpu_id` and map its ring, ready to
 /// drain. Returns NULL with errno on failure (`EPERM` without
 /// `SeSecurityPrivilege`, `EINVAL` for an out-of-range CPU, `ENOMEM` on OOM).
+///
+/// # Safety
+/// The caller must close a successful reader with `peios_event_reader_close` and serialize access
+/// to its state.
 #[no_mangle]
 pub unsafe extern "C" fn peios_event_reader_open(cpu_id: u32) -> *mut peios_event_reader {
     let (fd, ring, start, gen) = match attach_and_map(cpu_id) {
@@ -734,6 +777,10 @@ pub unsafe extern "C" fn peios_event_reader_open(cpu_id: u32) -> *mut peios_even
 
 /// `peios_event_reader_close` — unmap the ring, close the fd, free the reader
 /// (NULL-safe).
+///
+/// # Safety
+/// `reader` must be NULL or an exclusively owned reader returned by `peios_event_reader_open`
+/// that has not been closed. Borrowed event pointers become invalid.
 #[no_mangle]
 pub unsafe extern "C" fn peios_event_reader_close(reader: *mut peios_event_reader) {
     if let Some(r) = reader.as_mut() {
@@ -805,6 +852,10 @@ pub unsafe extern "C" fn peios_event_reader_wait(
 
 /// `peios_event_reader_lost` — the cumulative count of events lost (overwritten
 /// or dropped), inferred from per-CPU sequence gaps.
+///
+/// # Safety
+/// `reader` must be NULL or a live reader returned by `peios_event_reader_open`, without
+/// concurrent mutation or close.
 #[no_mangle]
 pub unsafe extern "C" fn peios_event_reader_lost(reader: *const peios_event_reader) -> u64 {
     match reader.as_ref() {
@@ -919,6 +970,31 @@ mod tests {
             payload: core::ptr::null(),
             payload_len: 0,
         }
+    }
+
+    #[test]
+    fn producer_after_empty_check_cannot_leave_reader_asleep() {
+        let mut fixture = RingFixture::new(128);
+        let ring = fixture.ring;
+        let result = ring.wait_until(0, || {
+            // The reader observed an empty ring. A producer publishes and wakes
+            // before FUTEX_WAIT: the old expected counter must prevent sleeping.
+            let was_ready = ring.write_pos() != 0;
+            fixture.set_positions(0, 1);
+            // SAFETY: the fixture owns initialized, aligned metadata storage,
+            // and this test has exclusive access while simulating the producer.
+            unsafe {
+                let counter = &*(ring.futex_ptr() as *const AtomicU32);
+                counter.fetch_add(1, Ordering::Release);
+            }
+            was_ready
+        });
+        assert!(matches!(result, Wait::Ready));
+        // SAFETY: the initialized consumer metadata lives for this test.
+        let need_wake = unsafe {
+            &*(ring.consumer().add(KMES_CONSUMER_NEED_WAKE_OFFSET as usize) as *const AtomicU8)
+        };
+        assert_eq!(need_wake.load(Ordering::Relaxed), 0);
     }
 
     #[test]
