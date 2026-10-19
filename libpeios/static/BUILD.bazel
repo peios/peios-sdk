@@ -1,5 +1,6 @@
 load("@crates//:crates.bzl", "all_crate_deps")
 load("@rules_rust//rust:defs.bzl", "rust_static_library")
+load("//build:static.bzl", "isolated_static")
 load("//build:version.bzl", "VERSION")
 
 package(default_visibility = ["//visibility:public"])
@@ -14,7 +15,7 @@ filegroup(
 # Separate output directories prevent cdylib/staticlib intermediate object races
 # when native builds use local execution without per-action sandboxes.
 rust_static_library(
-    name = "static",
+    name = "raw",
     srcs = ["//libpeios:rust-sources"],
     compile_data = ["//libpeios:rust-data"],
     crate_name = "peios",
@@ -22,6 +23,7 @@ rust_static_library(
     edition = "2021",
     rustc_flags = ["-Cpanic=abort"],
     version = VERSION,
+    visibility = ["//visibility:private"],
     deps = [
         "//:kacs-core",
         "//:peios-uapi",
@@ -30,4 +32,10 @@ rust_static_library(
         package_name = "libpeios",
         normal = True,
     ),
+)
+
+isolated_static(
+    name = "static",
+    prefix = "peios",
+    source = ":raw",
 )

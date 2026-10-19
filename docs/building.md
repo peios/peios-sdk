@@ -68,6 +68,26 @@ Package manifests and blobs are assembled by the pinned canonical writer.
 Package validation and native hardening checks are separate from ordinary
 source tests. Development artifacts are not signed release artifacts.
 
+## Static consumers
+
+The Bazel static targets namespace private implementation and Rust runtime
+symbols. This lets a Rust executable link the C ABI archive without conflicting
+with its own allocator or panic runtime; it also lets both SDK archives coexist.
+Public `peios_*` and `rsi_*` names and undefined system-library imports retain
+their names. The shared libraries are unchanged.
+
+Use the completed `//libpeios:static` and `//librsi:static` outputs for consumers.
+Cargo's compiler output is an intermediate archive; if using that development
+path, finish it explicitly before linking it into a Rust application:
+
+```sh
+python3 tools/isolate-static.py target/release/libpeios.a /tmp/libpeios.a --prefix peios
+```
+
+The `//:static-runtime-test` check links both archives into Rust executables
+with unwind and abort panic strategies and exercises userspace parsing.
+It does not invoke Peios kernel operations.
+
 ## Static debugging
 
 Packaged static archives have DWARF information removed while retaining

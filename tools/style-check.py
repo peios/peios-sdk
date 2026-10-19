@@ -46,7 +46,7 @@ def main() -> None:
     rust = sorted(
         str(path.relative_to(ROOT)) for name in RUST_ROOTS for path in (ROOT / name).rglob("*.rs")
     )
-    rust.extend(["libpeios/build.rs", "librsi/build.rs"])
+    rust.extend(["libpeios/build.rs", "librsi/build.rs", "tools/static-rust-smoke.rs"])
     python = sorted(
         str(path.relative_to(ROOT))
         for name in ("tools", "packages")

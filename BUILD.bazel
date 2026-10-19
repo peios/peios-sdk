@@ -205,3 +205,19 @@ host_test(
         "tools/test-source-inputs.py",
     ],
 )
+
+host_test(
+    name = "static-runtime-test",
+    size = "small",
+    command = "exec python3 tools/test-static-runtime.py $(rootpath //libpeios:static) $(rootpath //librsi:static)",
+    data = [
+        "tools/static-rust-smoke.rs",
+        "tools/test-static-runtime.py",
+        "//libpeios:static",
+        "//librsi:static",
+    ],
+    tags = [
+        "external",
+        "no-remote",
+    ],
+)
