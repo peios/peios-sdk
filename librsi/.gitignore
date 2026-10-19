@@ -1,0 +1,9 @@
+# Build artifacts
+/target/
+
+# pekit build output (out_dir).
+/out/
+
+# Project tooling
+.cairn/
+.pm/

@@ -1,0 +1,12 @@
+[package]
+name        = "dev.peios.librsi-debuginfo"
+description = "Peios registry-source C ABI library debugging symbols"
+
+
+[dependencies]
+"dev.peios.librsi" = "= {{release}}"
+
+[files]
+"@source:LICENSE"   = "usr/share/licenses/dev.peios.librsi-debuginfo/LICENSE"
+":licenses/**"      = "usr/share/licenses/dev.peios.librsi-debuginfo/third-party"
+":usr/lib/debug/**" = "usr/lib/debug"
