@@ -876,3 +876,40 @@ fn resource_claim_octets_build_kernel_accepted_descriptors() {
         assert_eq!(round_trip(&text), text);
     }
 }
+
+#[test]
+fn non_ascii_guids_are_rejected_without_slicing_utf8() {
+    for guid in [
+        "00000000-0000-0000-a€-000000000000",
+        "00000000-0000-0000-0000-a€00000000",
+        "00000000-0000-0000-0000-00000000000g",
+    ] {
+        assert!(matches!(parse_guid(guid), Err(SddlError::BadGuid(_))));
+        assert!(parse(&alloc::format!("D:(OA;;GR;{guid};;WD)")).is_err());
+    }
+}
+
+#[test]
+fn claim_offset_table_is_bounded_before_allocation() {
+    let claim = ClaimAttribute::new("tag", vec![ClaimValue::UInt64(1)]);
+    let valid = claim.encode().unwrap();
+    assert_eq!(decode_claim_entry(&valid).unwrap(), claim);
+    for count in [((valid.len() - 16) / 4 + 1) as u32, u32::MAX] {
+        let mut malformed = valid.clone();
+        malformed[12..16].copy_from_slice(&count.to_le_bytes());
+        assert!(matches!(
+            decode_claim_entry(&malformed),
+            Err(SddlError::Format(
+                "claim entry value-offset table truncated"
+            ))
+        ));
+    }
+    let mut short = valid[..20].to_vec();
+    short[12..16].copy_from_slice(&2u32.to_le_bytes());
+    assert!(matches!(
+        decode_claim_entry(&short),
+        Err(SddlError::Format(
+            "claim entry value-offset table truncated"
+        ))
+    ));
+}

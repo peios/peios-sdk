@@ -42,3 +42,26 @@ ssize_t peios_sddl_format_condition(char *out, size_t cap, const void *artx, siz
 So the round trip for a conditional ACE is: write the condition as text →
 `peios_sddl_parse_condition` → put the bytecode in `peios_ace_spec.app_data`
 with a callback ACE `type` → add it to an ACL builder.
+
+## Input limits and malformed data
+
+Conditional expressions have a maximum tree depth of 128. Each comparison,
+existence check, membership test, logical operator, or composite operand adds
+one level; scalar operands add none. For example, a comparison has depth one,
+and adding 127 negations reaches the limit. Long `&&` and `||` chains also
+count because each operator adds a level to the resulting tree.
+
+Text parsing also limits nested parentheses, negations, and composite braces
+to 128 levels along any one parsing path. Delimiters inside string literals do
+not count. These limits apply when parsing conditional ACEs inside a
+descriptor as well as when converting a standalone condition. The bytecode
+decoder applies the same tree limit, including nested composite operands.
+
+Inputs beyond either limit fail with `EINVAL`; simplify the expression before
+retrying. The C functions return `-1` and leave the output buffer untouched.
+
+GUID fields require ASCII hexadecimal digits in the standard hyphenated form.
+Malformed Unicode GUID text fails with `EINVAL`. When reading resource claims,
+the codec checks that the complete value-offset table fits inside the supplied
+bytes before allocating storage for its entries. An impossible or truncated
+table also fails with `EINVAL`.

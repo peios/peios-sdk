@@ -832,7 +832,8 @@ fn parse_optional_guid(s: &str) -> Result<Option<[u8; 16]>> {
 /// (little-endian Data1/2/3, big-endian Data4).
 fn parse_guid(s: &str) -> Result<[u8; 16]> {
     let bytes = s.as_bytes();
-    if bytes.len() != 36
+    if !s.is_ascii()
+        || bytes.len() != 36
         || bytes[8] != b'-'
         || bytes[13] != b'-'
         || bytes[18] != b'-'
@@ -857,7 +858,7 @@ fn parse_guid(s: &str) -> Result<[u8; 16]> {
 }
 
 fn parse_hex_byte_pairs(hex: &str, dst: &mut [u8]) -> Result<()> {
-    if hex.len() != dst.len() * 2 {
+    if !hex.is_ascii() || hex.len() != dst.len() * 2 {
         return Err(SddlError::BadGuid(hex.to_string()));
     }
     for (i, dst_byte) in dst.iter_mut().enumerate() {
@@ -1361,15 +1362,17 @@ fn decode_claim_entry(bytes: &[u8]) -> Result<ClaimAttribute> {
     let value_type = u16::from_le_bytes([bytes[4], bytes[5]]);
     let flags = u32::from_le_bytes([bytes[8], bytes[9], bytes[10], bytes[11]]);
     let value_count = u32::from_le_bytes([bytes[12], bytes[13], bytes[14], bytes[15]]) as usize;
+    // Validate the complete table before allocating from its untrusted count.
+    // Division avoids overflowing when a malicious count approaches u32::MAX.
+    if value_count > (bytes.len() - 16) / 4 {
+        return Err(SddlError::Format(
+            "claim entry value-offset table truncated",
+        ));
+    }
     // Value-offset table starts at byte 16.
     let mut value_offsets: Vec<usize> = Vec::with_capacity(value_count);
     for i in 0..value_count {
         let pos = 16 + i * 4;
-        if pos + 4 > bytes.len() {
-            return Err(SddlError::Format(
-                "claim entry value-offset table truncated",
-            ));
-        }
         value_offsets.push(u32::from_le_bytes([
             bytes[pos],
             bytes[pos + 1],

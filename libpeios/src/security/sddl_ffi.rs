@@ -374,4 +374,74 @@ mod tests {
         assert_eq!(r, -1);
         assert_eq!(crate::error::get_errno(), libc::ERANGE);
     }
+    #[test]
+    fn excessive_condition_depth_is_einval_and_preserves_output() {
+        let text = CString::new(format!("{}1 == 1", "!".repeat(128))).unwrap();
+        let mut output = [0xa5u8; 32];
+        // SAFETY: text is NUL-terminated and output is writable for its length.
+        let result = unsafe {
+            peios_sddl_parse_condition(output.as_mut_ptr().cast(), output.len(), text.as_ptr())
+        };
+        assert_eq!(result, -1);
+        assert_eq!(crate::error::get_errno(), libc::EINVAL);
+        assert_eq!(output, [0xa5; 32]);
+
+        let mut bytes = grammar::parse_condition_to_artx("1 == 1").unwrap();
+        bytes.extend(core::iter::repeat_n(0xa2, 128));
+        // SAFETY: bytes is readable and output is writable for their lengths.
+        let result = unsafe {
+            peios_sddl_format_condition(
+                output.as_mut_ptr().cast(),
+                output.len(),
+                bytes.as_ptr().cast(),
+                bytes.len(),
+            )
+        };
+        assert_eq!(result, -1);
+        assert_eq!(crate::error::get_errno(), libc::EINVAL);
+        assert_eq!(output, [0xa5; 32]);
+    }
+
+    #[test]
+    fn excessive_callback_depth_is_einval() {
+        let condition = format!("{}1 == 1", "!".repeat(128));
+        let descriptor = CString::new(format!("D:(XA;;GR;;;WD;({condition}))")).unwrap();
+        // SAFETY: descriptor is NUL-terminated; NULL output requests a size probe.
+        assert_eq!(
+            unsafe { peios_sddl_parse_sd(core::ptr::null_mut(), 0, descriptor.as_ptr()) },
+            -1
+        );
+        assert_eq!(crate::error::get_errno(), libc::EINVAL);
+    }
+
+    #[test]
+    fn non_ascii_guid_is_einval() {
+        let descriptor = CString::new("D:(OA;;GR;00000000-0000-0000-a€-000000000000;;WD)").unwrap();
+        // SAFETY: descriptor is NUL-terminated; NULL output requests a size probe.
+        assert_eq!(
+            unsafe { peios_sddl_parse_sd(core::ptr::null_mut(), 0, descriptor.as_ptr()) },
+            -1
+        );
+        assert_eq!(crate::error::get_errno(), libc::EINVAL);
+    }
+
+    #[test]
+    fn oversized_claim_table_is_einval() {
+        let mut bytes = grammar::parse("S:(RA;;;;;WD;(\"tag\",TU,0,1))")
+            .unwrap()
+            .build()
+            .unwrap();
+        let sacl = u32::from_le_bytes(bytes[12..16].try_into().unwrap()) as usize;
+        // ACL header, ACE header, mask, then Everyone SID precede the claim.
+        let claim = sacl + 8 + 4 + 4 + 12;
+        bytes[claim + 12..claim + 16].copy_from_slice(&u32::MAX.to_le_bytes());
+        // SAFETY: bytes is readable for its length; NULL output requests a probe.
+        assert_eq!(
+            unsafe {
+                peios_sddl_format_sd(core::ptr::null_mut(), 0, bytes.as_ptr().cast(), bytes.len())
+            },
+            -1
+        );
+        assert_eq!(crate::error::get_errno(), libc::EINVAL);
+    }
 }

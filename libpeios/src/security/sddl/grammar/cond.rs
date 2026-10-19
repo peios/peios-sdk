@@ -26,6 +26,7 @@ use crate::security::sddl::condition::{CompareOp, Condition, MemberOp, Operand};
 #[non_exhaustive]
 pub enum CondError {
     Eof,
+    TooDeep,
     Unexpected(char, usize),
     UnknownToken(usize, String),
     BadLiteral(usize, String),
@@ -38,6 +39,7 @@ pub type Result<T> = core::result::Result<T, CondError>;
 impl core::fmt::Display for CondError {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
+            CondError::TooDeep => write!(f, "condition exceeds the 128-level depth limit"),
             CondError::Eof => write!(f, "unexpected end of input"),
             CondError::Unexpected(c, off) => {
                 write!(f, "unexpected character {c:?} at offset {off}")
@@ -66,15 +68,13 @@ impl core::error::Error for CondError {}
 /// not — both are accepted.
 pub fn parse(s: &str) -> Result<Condition> {
     let s = s.trim();
-    // Strip one outer balanced "(...)" if the entire input is one group.
-    let s = strip_outer_parens(s);
     let mut p = Parser::new(s);
     let c = p.parse_expr()?;
     p.skip_ws();
     if !p.eof() {
         return Err(CondError::Unexpected(p.peek_char(), p.pos));
     }
-    Ok(c)
+    Ok(c.value)
 }
 
 /// Format a [`Condition`] as canonical SDDL conditional-expression text
@@ -99,14 +99,56 @@ pub fn decode_artx(bytes: &[u8]) -> Result<Condition> {
 // Recursive-descent text parser
 // ---------------------------------------------------------------------------
 
+/// Bound both parser recursion and the resulting tree, including operands.
+/// Scalar operands have depth zero; each condition or composite adds one.
+const MAX_CONDITION_DEPTH: usize = 128;
+
+#[derive(Debug)]
+struct Bounded<T> {
+    value: T,
+    depth: usize,
+}
+
+impl<T> Bounded<T> {
+    fn scalar(value: T) -> Self {
+        Self { value, depth: 0 }
+    }
+
+    fn parent(child_depth: usize, build: impl FnOnce() -> T) -> Result<Self> {
+        let depth = child_depth + 1;
+        if depth > MAX_CONDITION_DEPTH {
+            return Err(CondError::TooDeep);
+        }
+        Ok(Self {
+            value: build(),
+            depth,
+        })
+    }
+}
+
 struct Parser<'a> {
     src: &'a str,
     pos: usize,
+    nesting: usize,
 }
 
 impl<'a> Parser<'a> {
     fn new(src: &'a str) -> Self {
-        Self { src, pos: 0 }
+        Self {
+            src,
+            pos: 0,
+            nesting: 0,
+        }
+    }
+
+    fn nested<T>(&mut self, parse: impl FnOnce(&mut Self) -> Result<T>) -> Result<T> {
+        if self.nesting == MAX_CONDITION_DEPTH {
+            return Err(CondError::TooDeep);
+        }
+        self.nesting += 1;
+        let result = parse(self);
+        self.nesting -= 1;
+        result
     }
 
     fn eof(&self) -> bool {
@@ -176,14 +218,14 @@ impl<'a> Parser<'a> {
     }
 
     /// Top-level: || has lowest precedence.
-    fn parse_expr(&mut self) -> Result<Condition> {
+    fn parse_expr(&mut self) -> Result<Bounded<Condition>> {
         let mut lhs = self.parse_and()?;
         loop {
             self.skip_ws();
             if self.eat("||") {
                 self.skip_ws();
                 let rhs = self.parse_and()?;
-                lhs = lhs.or(rhs);
+                lhs = Bounded::parent(lhs.depth.max(rhs.depth), || lhs.value.or(rhs.value))?;
             } else {
                 break;
             }
@@ -191,14 +233,14 @@ impl<'a> Parser<'a> {
         Ok(lhs)
     }
 
-    fn parse_and(&mut self) -> Result<Condition> {
+    fn parse_and(&mut self) -> Result<Bounded<Condition>> {
         let mut lhs = self.parse_unary()?;
         loop {
             self.skip_ws();
             if self.eat("&&") {
                 self.skip_ws();
                 let rhs = self.parse_unary()?;
-                lhs = lhs.and(rhs);
+                lhs = Bounded::parent(lhs.depth.max(rhs.depth), || lhs.value.and(rhs.value))?;
             } else {
                 break;
             }
@@ -206,22 +248,22 @@ impl<'a> Parser<'a> {
         Ok(lhs)
     }
 
-    fn parse_unary(&mut self) -> Result<Condition> {
+    fn parse_unary(&mut self) -> Result<Bounded<Condition>> {
         self.skip_ws();
         if self.eat("!") {
             self.skip_ws();
-            let inner = self.parse_unary()?;
-            return Ok(inner.negate());
+            let inner = self.nested(Self::parse_unary)?;
+            return Bounded::parent(inner.depth, || inner.value.negate());
         }
         self.parse_primary()
     }
 
     /// Primary expression: a parenthesised expression, an Exists/Not_Exists
     /// check, a membership test, or a relational comparison.
-    fn parse_primary(&mut self) -> Result<Condition> {
+    fn parse_primary(&mut self) -> Result<Bounded<Condition>> {
         self.skip_ws();
         if self.eat("(") {
-            let e = self.parse_expr()?;
+            let e = self.nested(Self::parse_expr)?;
             self.skip_ws();
             if !self.eat(")") {
                 return Err(CondError::Unbalanced("expected ')'"));
@@ -232,12 +274,12 @@ impl<'a> Parser<'a> {
         if self.try_keyword("Exists") {
             self.skip_ws();
             let o = self.parse_operand()?;
-            return Ok(Condition::Exists(o));
+            return Bounded::parent(o.depth, || Condition::Exists(o.value));
         }
         if self.try_keyword("Not_Exists") {
             self.skip_ws();
             let o = self.parse_operand()?;
-            return Ok(Condition::NotExists(o));
+            return Bounded::parent(o.depth, || Condition::NotExists(o.value));
         }
 
         // Membership operators — they're prefix in SDDL (`Member_of {…}`).
@@ -247,7 +289,10 @@ impl<'a> Parser<'a> {
             if self.try_keyword(kw) {
                 self.skip_ws();
                 let o = self.parse_operand()?;
-                return Ok(Condition::Member { op, operand: o });
+                return Bounded::parent(o.depth, || Condition::Member {
+                    op,
+                    operand: o.value,
+                });
             }
             self.pos = saved;
         }
@@ -258,7 +303,11 @@ impl<'a> Parser<'a> {
         let op = self.parse_compare_op()?;
         self.skip_ws();
         let rhs = self.parse_operand()?;
-        Ok(Condition::Compare { op, lhs, rhs })
+        Bounded::parent(lhs.depth.max(rhs.depth), || Condition::Compare {
+            op,
+            lhs: lhs.value,
+            rhs: rhs.value,
+        })
     }
 
     fn parse_compare_op(&mut self) -> Result<CompareOp> {
@@ -282,7 +331,7 @@ impl<'a> Parser<'a> {
         ))
     }
 
-    fn parse_operand(&mut self) -> Result<Operand> {
+    fn parse_operand(&mut self) -> Result<Bounded<Operand>> {
         self.skip_ws();
         if self.eof() {
             return Err(CondError::Eof);
@@ -291,7 +340,7 @@ impl<'a> Parser<'a> {
         match c {
             '"' => self.parse_string_lit().map(Operand::Str),
             '#' => self.parse_octet_lit().map(Operand::Octet),
-            '{' => self.parse_composite(),
+            '{' => return self.nested(Self::parse_composite),
             '-' | '0'..='9' => self.parse_int_lit().map(Operand::Int),
             '@' => self.parse_attr_ref(),
             'S' | 's' => {
@@ -310,6 +359,7 @@ impl<'a> Parser<'a> {
             }
             _ => Err(CondError::Unexpected(c, self.pos)),
         }
+        .map(Bounded::scalar)
     }
 
     fn parse_string_lit(&mut self) -> Result<String> {
@@ -394,18 +444,20 @@ impl<'a> Parser<'a> {
         super::parse_signed_i64(lit).map_err(|_| CondError::BadLiteral(start, lit.to_string()))
     }
 
-    fn parse_composite(&mut self) -> Result<Operand> {
+    fn parse_composite(&mut self) -> Result<Bounded<Operand>> {
         if !self.eat("{") {
             return Err(CondError::Unexpected('{', self.pos));
         }
         let mut items: Vec<Operand> = Vec::new();
+        let mut child_depth = 0;
         loop {
             self.skip_ws();
             if self.eat("}") {
                 break;
             }
             let o = self.parse_operand()?;
-            items.push(o);
+            child_depth = child_depth.max(o.depth);
+            items.push(o.value);
             self.skip_ws();
             if self.eat(",") {
                 continue;
@@ -415,7 +467,7 @@ impl<'a> Parser<'a> {
                 return Err(CondError::Unbalanced("expected ',' or '}'"));
             }
         }
-        Ok(Operand::Composite(items))
+        Bounded::parent(child_depth, || Operand::Composite(items))
     }
 
     fn parse_attr_ref(&mut self) -> Result<Operand> {
@@ -479,28 +531,6 @@ fn is_ident_continue(b: u8) -> bool {
     // SDDL attribute names allow letters, digits, '_' and ':' (the spec
     // is permissive). We also accept '.' to allow dotted names.
     b.is_ascii_alphanumeric() || b == b'_' || b == b':' || b == b'.'
-}
-
-fn strip_outer_parens(s: &str) -> &str {
-    let bytes = s.as_bytes();
-    if bytes.len() < 2 || bytes[0] != b'(' || bytes[bytes.len() - 1] != b')' {
-        return s;
-    }
-    // Verify the closing paren matches the opening one.
-    let mut depth: i32 = 0;
-    for (i, &b) in bytes.iter().enumerate() {
-        match b {
-            b'(' => depth += 1,
-            b')' => {
-                depth -= 1;
-                if depth == 0 && i != bytes.len() - 1 {
-                    return s;
-                }
-            }
-            _ => {}
-        }
-    }
-    &s[1..s.len() - 1]
 }
 
 // ---------------------------------------------------------------------------
@@ -704,8 +734,8 @@ const TOK_ATTR_DEVICE: u8 = 0xfb;
 
 #[derive(Debug)]
 enum Item {
-    Operand(Operand),
-    Condition(Condition),
+    Operand(Bounded<Operand>),
+    Condition(Bounded<Condition>),
 }
 
 struct ArtxDecoder<'a> {
@@ -731,42 +761,50 @@ impl<'a> ArtxDecoder<'a> {
                 0x00 => {} // padding
                 TOK_INT64 => {
                     let n = self.take_int64()?;
-                    self.stack.push(Item::Operand(Operand::Int(n)));
+                    self.stack
+                        .push(Item::Operand(Bounded::scalar(Operand::Int(n))));
                 }
                 TOK_STRING => {
                     let s = self.take_utf16_lp()?;
-                    self.stack.push(Item::Operand(Operand::Str(s)));
+                    self.stack
+                        .push(Item::Operand(Bounded::scalar(Operand::Str(s))));
                 }
                 TOK_OCTET => {
                     let bytes = self.take_lp_bytes()?;
-                    self.stack.push(Item::Operand(Operand::Octet(bytes)));
+                    self.stack
+                        .push(Item::Operand(Bounded::scalar(Operand::Octet(bytes))));
                 }
                 TOK_SID => {
                     let bytes = self.take_lp_bytes()?;
                     let (sid, _) = crate::security::sddl::wire::SidRef::parse(&bytes)
                         .map_err(|_| CondError::Artx("malformed SID literal"))?;
-                    self.stack.push(Item::Operand(Operand::Sid(sid.to_owned())));
+                    self.stack
+                        .push(Item::Operand(Bounded::scalar(Operand::Sid(sid.to_owned()))));
                 }
                 TOK_COMPOSITE => {
                     let body = self.take_lp_bytes()?;
-                    let items = ArtxDecoder::decode_composite(&body)?;
-                    self.stack.push(Item::Operand(Operand::Composite(items)));
+                    let operand = ArtxDecoder::decode_composite(&body, 1)?;
+                    self.stack.push(Item::Operand(operand));
                 }
                 TOK_ATTR_LOCAL => {
                     let n = self.take_utf16_lp()?;
-                    self.stack.push(Item::Operand(Operand::Local(n)));
+                    self.stack
+                        .push(Item::Operand(Bounded::scalar(Operand::Local(n))));
                 }
                 TOK_ATTR_USER => {
                     let n = self.take_utf16_lp()?;
-                    self.stack.push(Item::Operand(Operand::User(n)));
+                    self.stack
+                        .push(Item::Operand(Bounded::scalar(Operand::User(n))));
                 }
                 TOK_ATTR_RESOURCE => {
                     let n = self.take_utf16_lp()?;
-                    self.stack.push(Item::Operand(Operand::Resource(n)));
+                    self.stack
+                        .push(Item::Operand(Bounded::scalar(Operand::Resource(n))));
                 }
                 TOK_ATTR_DEVICE => {
                     let n = self.take_utf16_lp()?;
-                    self.stack.push(Item::Operand(Operand::Device(n)));
+                    self.stack
+                        .push(Item::Operand(Bounded::scalar(Operand::Device(n))));
                 }
                 TOK_EXISTS => self.push_unary_op(Condition::Exists)?,
                 TOK_NOT_EXISTS => self.push_unary_op(Condition::NotExists)?,
@@ -775,18 +813,31 @@ impl<'a> ArtxDecoder<'a> {
                 TOK_NOT => {
                     let inner = self.pop_condition()?;
                     self.stack
-                        .push(Item::Condition(Condition::Not(Box::new(inner))));
+                        .push(Item::Condition(Bounded::parent(inner.depth, || {
+                            Condition::Not(Box::new(inner.value))
+                        })?));
                 }
                 t => {
                     if let Some(op) = compare_from_byte(t) {
                         let rhs = self.pop_operand()?;
                         let lhs = self.pop_operand()?;
-                        self.stack
-                            .push(Item::Condition(Condition::Compare { op, lhs, rhs }));
+                        self.stack.push(Item::Condition(Bounded::parent(
+                            lhs.depth.max(rhs.depth),
+                            || Condition::Compare {
+                                op,
+                                lhs: lhs.value,
+                                rhs: rhs.value,
+                            },
+                        )?));
                     } else if let Some(op) = member_from_byte(t) {
                         let operand = self.pop_operand()?;
                         self.stack
-                            .push(Item::Condition(Condition::Member { op, operand }));
+                            .push(Item::Condition(Bounded::parent(operand.depth, || {
+                                Condition::Member {
+                                    op,
+                                    operand: operand.value,
+                                }
+                            })?));
                     } else {
                         return Err(CondError::Artx("unknown bytecode"));
                     }
@@ -799,7 +850,7 @@ impl<'a> ArtxDecoder<'a> {
             ));
         }
         match self.stack.pop().unwrap() {
-            Item::Condition(c) => Ok(c),
+            Item::Condition(c) => Ok(c.value),
             Item::Operand(_) => Err(CondError::Artx(
                 "top-level item was an operand, not a condition",
             )),
@@ -808,7 +859,8 @@ impl<'a> ArtxDecoder<'a> {
 
     fn push_unary_op<F: Fn(Operand) -> Condition>(&mut self, ctor: F) -> Result<()> {
         let o = self.pop_operand()?;
-        self.stack.push(Item::Condition(ctor(o)));
+        self.stack
+            .push(Item::Condition(Bounded::parent(o.depth, || ctor(o.value))?));
         Ok(())
     }
 
@@ -818,12 +870,14 @@ impl<'a> ArtxDecoder<'a> {
     ) -> Result<()> {
         let b = self.pop_condition()?;
         let a = self.pop_condition()?;
-        self.stack
-            .push(Item::Condition(ctor(Box::new(a), Box::new(b))));
+        self.stack.push(Item::Condition(Bounded::parent(
+            a.depth.max(b.depth),
+            || ctor(Box::new(a.value), Box::new(b.value)),
+        )?));
         Ok(())
     }
 
-    fn pop_operand(&mut self) -> Result<Operand> {
+    fn pop_operand(&mut self) -> Result<Bounded<Operand>> {
         match self.stack.pop() {
             Some(Item::Operand(o)) => Ok(o),
             Some(Item::Condition(_)) => Err(CondError::Artx("expected operand, got condition")),
@@ -831,7 +885,7 @@ impl<'a> ArtxDecoder<'a> {
         }
     }
 
-    fn pop_condition(&mut self) -> Result<Condition> {
+    fn pop_condition(&mut self) -> Result<Bounded<Condition>> {
         match self.stack.pop() {
             Some(Item::Condition(c)) => Ok(c),
             Some(Item::Operand(_)) => Err(CondError::Artx("expected condition, got operand")),
@@ -896,10 +950,14 @@ impl<'a> ArtxDecoder<'a> {
         String::from_utf16(&units).map_err(|_| CondError::Artx("malformed UTF-16 string"))
     }
 
-    fn decode_composite(bytes: &[u8]) -> Result<Vec<Operand>> {
+    fn decode_composite(bytes: &[u8], nesting: usize) -> Result<Bounded<Operand>> {
+        if nesting > MAX_CONDITION_DEPTH {
+            return Err(CondError::TooDeep);
+        }
         // A composite body is a sequence of operand tokens, no operators.
         let mut d = ArtxDecoder::new(bytes);
         let mut items: Vec<Operand> = Vec::new();
+        let mut child_depth = 0;
         while d.pos < d.bytes.len() {
             let tok = d.bytes[d.pos];
             d.pos += 1;
@@ -916,13 +974,16 @@ impl<'a> ArtxDecoder<'a> {
                 }
                 TOK_COMPOSITE => {
                     let inner = d.take_lp_bytes()?;
-                    Operand::Composite(ArtxDecoder::decode_composite(&inner)?)
+                    let operand = ArtxDecoder::decode_composite(&inner, nesting + 1)?;
+                    child_depth = child_depth.max(operand.depth);
+                    items.push(operand.value);
+                    continue;
                 }
                 _ => return Err(CondError::Artx("composite contains non-operand token")),
             };
             items.push(o);
         }
-        Ok(items)
+        Bounded::parent(child_depth, || Operand::Composite(items))
     }
 }
 
@@ -953,5 +1014,164 @@ fn member_from_byte(b: u8) -> Option<MemberOp> {
         0x92 => Some(MemberOp::NotMemberOfAny),
         0x93 => Some(MemberOp::NotDeviceMemberOfAny),
         _ => None,
+    }
+}
+
+#[cfg(test)]
+mod depth_tests {
+    use super::*;
+
+    fn grouped(count: usize) -> String {
+        format!("{}1 == 1{}", "(".repeat(count), ")".repeat(count))
+    }
+
+    fn composite_text(count: usize) -> String {
+        format!(
+            "Member_of {}SID(WD){}",
+            "{".repeat(count),
+            "}".repeat(count)
+        )
+    }
+
+    fn composite_bytes(count: usize) -> Vec<u8> {
+        let mut body = alloc::vec![TOK_INT64];
+        body.extend_from_slice(&1i64.to_le_bytes());
+        body.extend_from_slice(&[3, 2]);
+        for _ in 0..count {
+            let mut outer = alloc::vec![TOK_COMPOSITE];
+            outer.extend_from_slice(&(body.len() as u32).to_le_bytes());
+            outer.extend_from_slice(&body);
+            body = outer;
+        }
+        let mut bytes = b"artx".to_vec();
+        bytes.extend_from_slice(&body);
+        bytes.push(0x89); // Member_of.
+        bytes
+    }
+
+    fn boolean_bytes(terms: usize, operator: u8) -> Vec<u8> {
+        let leaf = parse("1 == 1").unwrap().encode();
+        let mut bytes = b"artx".to_vec();
+        bytes.extend_from_slice(&leaf[4..]);
+        for _ in 1..terms {
+            bytes.extend_from_slice(&leaf[4..]);
+            bytes.push(operator);
+        }
+        bytes
+    }
+
+    #[test]
+    fn text_parentheses_have_a_128_level_recursion_limit() {
+        assert!(parse(&grouped(MAX_CONDITION_DEPTH)).is_ok());
+        for count in [MAX_CONDITION_DEPTH + 1, 16_000] {
+            assert_eq!(parse(&grouped(count)), Err(CondError::TooDeep));
+        }
+    }
+
+    #[test]
+    fn text_negation_has_a_128_level_tree_limit() {
+        let accepted = format!("{}1 == 1", "!".repeat(MAX_CONDITION_DEPTH - 1));
+        assert!(parse(&accepted).is_ok());
+        for count in [MAX_CONDITION_DEPTH, 16_000] {
+            let rejected = format!("{}1 == 1", "!".repeat(count));
+            assert_eq!(parse(&rejected), Err(CondError::TooDeep));
+        }
+    }
+
+    #[test]
+    fn text_boolean_chains_count_towards_tree_depth() {
+        for operator in [" && ", " || "] {
+            let accepted = alloc::vec!["1 == 1"; MAX_CONDITION_DEPTH].join(operator);
+            assert!(parse(&accepted).is_ok());
+            let rejected = format!("{accepted}{operator}1 == 1");
+            assert_eq!(parse(&rejected), Err(CondError::TooDeep));
+        }
+    }
+
+    #[test]
+    fn text_composites_count_towards_tree_depth() {
+        assert!(parse(&composite_text(MAX_CONDITION_DEPTH - 1)).is_ok());
+        for count in [MAX_CONDITION_DEPTH, 16_000] {
+            assert_eq!(parse(&composite_text(count)), Err(CondError::TooDeep));
+        }
+    }
+
+    #[test]
+    fn mixed_operators_and_operands_share_the_tree_limit() {
+        let accepted = format!("!{}", composite_text(MAX_CONDITION_DEPTH - 2));
+        let condition = parse(&accepted).unwrap();
+        assert!(decode_artx(&condition.encode()).is_ok());
+        assert_eq!(parse(&format!("!{accepted}")), Err(CondError::TooDeep));
+        assert_eq!(
+            parse(&format!("1 == 1 || {accepted}")),
+            Err(CondError::TooDeep)
+        );
+    }
+
+    #[test]
+    fn delimiters_in_strings_do_not_consume_depth() {
+        let literal = "(!{".repeat(1000);
+        assert!(parse(&format!("@User.Name == \"{literal}\"")).is_ok());
+    }
+
+    #[test]
+    fn binary_negation_has_a_128_level_tree_limit() {
+        let mut bytes = parse("1 == 1").unwrap().encode();
+        bytes.extend(core::iter::repeat_n(TOK_NOT, MAX_CONDITION_DEPTH - 1));
+        assert!(decode_artx(&bytes).is_ok());
+        bytes.push(TOK_NOT);
+        assert_eq!(decode_artx(&bytes), Err(CondError::TooDeep));
+        bytes.extend(core::iter::repeat_n(TOK_NOT, 16_000));
+        assert_eq!(decode_artx(&bytes), Err(CondError::TooDeep));
+    }
+
+    #[test]
+    fn binary_boolean_chains_count_towards_tree_depth() {
+        for operator in [TOK_AND, TOK_OR] {
+            assert!(decode_artx(&boolean_bytes(MAX_CONDITION_DEPTH, operator)).is_ok());
+            for count in [MAX_CONDITION_DEPTH + 1, 16_000] {
+                assert_eq!(
+                    decode_artx(&boolean_bytes(count, operator)),
+                    Err(CondError::TooDeep)
+                );
+            }
+            // Delay all operators until every operand is on the decoder stack.
+            let leaf = parse("1 == 1").unwrap().encode();
+            for count in [MAX_CONDITION_DEPTH, MAX_CONDITION_DEPTH + 1] {
+                let mut bytes = b"artx".to_vec();
+                for _ in 0..count {
+                    bytes.extend_from_slice(&leaf[4..]);
+                }
+                bytes.extend(core::iter::repeat_n(operator, count - 1));
+                if count == MAX_CONDITION_DEPTH {
+                    assert!(decode_artx(&bytes).is_ok());
+                } else {
+                    assert_eq!(decode_artx(&bytes), Err(CondError::TooDeep));
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn binary_composites_count_towards_tree_depth() {
+        assert!(decode_artx(&composite_bytes(MAX_CONDITION_DEPTH - 1)).is_ok());
+        for count in [MAX_CONDITION_DEPTH, 1000] {
+            assert_eq!(
+                decode_artx(&composite_bytes(count)),
+                Err(CondError::TooDeep)
+            );
+        }
+    }
+
+    #[test]
+    fn truncated_input_drops_only_bounded_partial_trees() {
+        let text = format!(
+            "{} &&",
+            alloc::vec!["1 == 1"; MAX_CONDITION_DEPTH].join(" && ")
+        );
+        assert!(parse(&text).is_err());
+        let mut bytes = boolean_bytes(MAX_CONDITION_DEPTH, TOK_AND);
+        bytes.push(TOK_COMPOSITE);
+        assert!(decode_artx(&bytes).is_err());
     }
 }
