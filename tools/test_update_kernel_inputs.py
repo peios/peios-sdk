@@ -139,6 +139,16 @@ class SnapshotTests(unittest.TestCase):
             updater.update_snapshot(self.kernel, commit, self.snapshot)
         self.assertEqual(updater.check_snapshot(self.snapshot)["commit"], self.commit)
 
+    def test_accepts_group_writable_checkout_permissions(self) -> None:
+        (self.snapshot / "peios/rust/kacs-core/fixture.rs").chmod(0o664)
+        (self.snapshot / self.executable.relative_to(self.kernel)).chmod(0o775)
+        self.assertEqual(updater.check_snapshot(self.snapshot), self.metadata)
+
+    def test_detects_added_executable_mode(self) -> None:
+        (self.snapshot / "peios/rust/kacs-core/fixture.rs").chmod(0o755)
+        with self.assertRaisesRegex(updater.SnapshotError, "mode was changed"):
+            updater.check_snapshot(self.snapshot)
+
     def test_detects_changed_executable_mode(self) -> None:
         (self.snapshot / self.executable.relative_to(self.kernel)).chmod(0o644)
         with self.assertRaisesRegex(updater.SnapshotError, "mode was changed"):

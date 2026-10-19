@@ -172,7 +172,7 @@ def load_origin(snapshot: Path, *, allow_legacy: bool, bazel_inputs: bool) -> di
 def check_snapshot(
     snapshot: Path, *, allow_legacy: bool = False, bazel_inputs: bool = False
 ) -> dict[str, Any]:
-    """Verify the full file set, hashes and modes; do not trust symlink targets."""
+    """Verify the file set, hashes and Git modes; do not trust symlink targets."""
     data = load_origin(snapshot, allow_legacy=allow_legacy, bazel_inputs=bazel_inputs)
     actual = set()
     for path in snapshot.rglob("*"):
@@ -197,11 +197,12 @@ def check_snapshot(
             actual_digest = hashlib.file_digest(source, "sha256").hexdigest()
         if actual_digest != digest:
             raise SnapshotError(f"kernel-owned input was changed: {name}")
+        # Git records executable status, not checkout permissions from umask.
         expected_mode = data.get("file_modes", {}).get(name)
         if (
             expected_mode
             and not bazel_inputs
-            and stat.S_IMODE(path.stat().st_mode) != (int(expected_mode, 8) & 0o777)
+            and bool(path.stat().st_mode & stat.S_IXUSR) != (expected_mode == "100755")
         ):
             raise SnapshotError(f"kernel-owned file mode was changed: {name}")
     for root in data["paths"]:
