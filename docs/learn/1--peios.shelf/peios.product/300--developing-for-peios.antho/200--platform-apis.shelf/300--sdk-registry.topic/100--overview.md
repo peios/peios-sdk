@@ -29,16 +29,16 @@ A **value** is a named, typed piece of data on a key (`REG_SZ`, `REG_DWORD`,
 ## Layers and precedence — the LCS idea
 
 Here is what makes LCS more than a key/value store. Every value write is
-tagged with a **layer**, and layers have a fixed precedence order. When you
-read a value, LCS resolves the **effective** entry — the one from the
-highest-precedence layer that has something to say — and that's what you get
-back.
+tagged with a **layer**, and each layer has a precedence. When you read a
+value, LCS resolves the **effective** entry — the one from the
+highest-precedence layer that has something to say, or, among layers of equal
+precedence, the most recent write — and that's what you get back.
 
 This is what lets configuration compose cleanly:
 
-- A base layer ships default configuration.
-- A site or policy layer overlays organization-wide settings.
-- A machine-local layer overrides per-host.
+- The base layer, at precedence 0, receives every write that names no layer.
+- Role layers also sit at precedence 0 and carry what an installed role adds.
+- Policy layers sit above precedence 0 and override both.
 
 They all coexist on the same key. Reading gives you the winner; writing
 targets a *specific* layer (or the base layer by default). And because it's
@@ -60,9 +60,10 @@ on a write, and the write only lands if nothing changed underneath you.
 
 ## Transactions
 
-Mutating operations — creating keys, setting values, and deleting values — can
-be
-grouped into a **transaction** and committed atomically, so a multi-step
+Mutating operations can be grouped into a **transaction** and committed
+atomically: writing or deleting a value, setting or removing a blanket
+tombstone, creating, deleting, or hiding a key, and changing a security
+descriptor. A transaction covers one hive, so a multi-step
 configuration change either fully applies or not at all. Transactions are
 abort-by-default: close the transaction fd without committing and nothing
 happens. See [watching and
