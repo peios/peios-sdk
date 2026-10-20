@@ -17,7 +17,7 @@ To keep the fragments readable, most error checks are elided here — every call
 [`peios_file_open`](~peios/sdk-files/opening-a-file) is shaped like `NtCreateFile`: you state the access you want, what to do about existence (the *disposition*), any create options, and — when creating — the security descriptor to stamp on the new file. It returns an ordinary Linux fd whose **granted access is fixed for the fd's lifetime**, which means you can safely hand it to another process by `SCM_RIGHTS`, `dup`, or across `exec`: the fd carries exactly the access it was opened with.
 
 > [!IMPORTANT]
-> At kernel `8e0e22de3a59cad506bbbf8873de456e16ad272d`, `OPEN_IF` or `OVERWRITE_IF` with a creator SD fails with `EINVAL` for an existing path. Plain `OPEN` with a creator SD fails with `EOPNOTSUPP`, and `OVERWRITE` with one fails with `EINVAL`. The [pinned source findings](~peios/advanced-peios/peios-kernel/kacs/kacs-abi-notes#pinned-source-findings) resolve these cases, not every [open-interface discrepancy](~peios/advanced-peios/peios-kernel/kacs/kacs-abi-notes#open-interface-documentation-discrepancies). No deployed build was tested.
+> At kernel `8e0e22de3a59cad506bbbf8873de456e16ad272d`, `OPEN_IF` or `OVERWRITE_IF` with a creator SD fails with `EINVAL` for an existing path. Plain `OPEN` with a creator SD fails with `EOPNOTSUPP`, and `OVERWRITE` with one fails with `EINVAL`. The [pinned source findings](~peios/reference/peios-kernel/kacs/kacs-abi-notes#pinned-source-findings) resolve these cases, not every [open-interface discrepancy](~peios/reference/peios-kernel/kacs/kacs-abi-notes#open-interface-documentation-discrepancies). No deployed build was tested.
 
 Create a new file, readable and writable, with a creator SD. An existing path is
 an error:
@@ -92,9 +92,9 @@ Because only `KACS_SECINFO_DACL` is selected, the owner, group, and SACL are lef
 
 ## Raw file-security interface
 
-The SDK helpers above wrap `kacs_get_sd` and `kacs_set_sd`. The following low-level details belong to programs implementing descriptor tools; shell users should use [Managing file security](~peios/file-permissions/managing-file-security). The generated [KACS ABI](~peios/advanced-peios/peios-kernel/kacs/kacs-abi) is the source for syscall numbers and `KACS_SECINFO_*` constants; the `*_SECURITY_INFORMATION` names below are their specification spellings.
+The SDK helpers above wrap `kacs_get_sd` and `kacs_set_sd`. The following low-level details belong to programs implementing descriptor tools; shell users should use [Managing file security](~peios/file-permissions/managing-file-security). The generated [KACS ABI](~peios/reference/peios-kernel/kacs/kacs-abi) is the source for syscall numbers and `KACS_SECINFO_*` constants; the `*_SECURITY_INFORMATION` names below are their specification spellings.
 
-Raw access to `security.peios.sd` or `system.ntfs_security` is denied for reads, writes and removal. In particular, a raw read would expose the SACL without the component-specific `ACCESS_SYSTEM_SECURITY` gate. The syscall pair unifies access rules, validates descriptors and abstracts filesystem storage; see [File Descriptor Storage](~peios/advanced-peios/peios-kernel/kacs/facs/descriptor-storage).
+Raw access to `security.peios.sd` or `system.ntfs_security` is denied for reads, writes and removal. In particular, a raw read would expose the SACL without the component-specific `ACCESS_SYSTEM_SECURITY` gate. The syscall pair unifies access rules, validates descriptors and abstracts filesystem storage; see [File Descriptor Storage](~peios/reference/peios-kernel/kacs/facs/descriptor-storage).
 
 ## kacs_get_sd
 
@@ -141,7 +141,7 @@ Different components need different rights:
 | `SACL_SECURITY_INFORMATION` | `ACCESS_SYSTEM_SECURITY` |
 | `LABEL_SECURITY_INFORMATION` | `READ_CONTROL` (the integrity label is in the SACL but its read is gated by READ_CONTROL, not ACCESS_SYSTEM_SECURITY) |
 
-(The numeric flag values are catalogued in [Other constants](~peios/advanced-peios/constants-and-catalogs/other-constants).)
+(The numeric flag values are catalogued in [Other constants](~peios/reference/constants-and-catalogs/other-constants).)
 
 `READ_CONTROL` is the standard "read SD" right. Its implicit grant to the owner is subject to [OWNER RIGHTS and the other access layers](~peios/security-descriptors/ownership). `ACCESS_SYSTEM_SECURITY` is gated by `SeSecurityPrivilege`; an administrator label alone is not sufficient.
 
@@ -177,7 +177,7 @@ The kernel:
 5. Writes the SD to the file's native storage.
 6. Returns 0 on success.
 
-Validation and component-right checks must succeed before the selected components are merged; unselected components are preserved. This is not a concurrent-update transaction. The [Kernel TRM storage rules](~peios/advanced-peios/peios-kernel/kacs/facs/descriptor-storage#caching) describe a last-writer-wins window: the xattr write and cache publication are not atomic with each other, although readers do not see a partially written descriptor. Coordinate writers rather than treating a read/edit/write sequence as compare-and-swap.
+Validation and component-right checks must succeed before the selected components are merged; unselected components are preserved. This is not a concurrent-update transaction. The [Kernel TRM storage rules](~peios/reference/peios-kernel/kacs/facs/descriptor-storage#caching) describe a last-writer-wins window: the xattr write and cache publication are not atomic with each other, although readers do not see a partially written descriptor. Coordinate writers rather than treating a read/edit/write sequence as compare-and-swap.
 
 ### Access rules for writes
 
@@ -246,12 +246,12 @@ These are raw kernel error names; the SDK wrappers return `-1` and set `errno`.
 | `-ENOENT` | The target path does not exist. |
 | `-EROFS` | The selected path reaches the object through a read-only mount. |
 
-The [Kernel TRM raw-call contract](~peios/advanced-peios/peios-kernel/kacs/facs/native-open#special-nodes-and-symlinks) says `AT_SYMLINK_NOFOLLOW` on `kacs_get_sd` and `kacs_set_sd` selects the symlink object, unlike native open, which fails with `ELOOP` in that case. The flag descriptions above follow that kernel contract.
+The [Kernel TRM raw-call contract](~peios/reference/peios-kernel/kacs/facs/native-open#special-nodes-and-symlinks) says `AT_SYMLINK_NOFOLLOW` on `kacs_get_sd` and `kacs_set_sd` selects the symlink object, unlike native open, which fails with `ELOOP` in that case. The flag descriptions above follow that kernel contract.
 
 > [!IMPORTANT]
 > The [SDK query reference](~peios/sdk-files/reading-and-writing-a-file-s-security-descriptor#by-path) now records the pinned-source result: `AT_SYMLINK_NOFOLLOW` queries the terminal link's own SD, whereas native open rejects that link with `ELOOP`. libpeios forwards the query's flags. This resolves the former blanket no-follow query error; it does not establish that a link-SD write succeeds. The set-security description above retains its separate rights and storage requirements. No runtime test or historical release boundary was established.
 
-For live-check versus cached-fd restore behavior, mandatory SACL attributes and full-SACL label constraints, see [The Set-Security Interface](~peios/advanced-peios/peios-kernel/kacs/facs/set-security). A full SACL write replaces the entire SACL. A label-only write preserves non-label ACEs; its input is either no SACL, to remove the explicit label, or a SACL containing exactly one non-inherit-only mandatory-label ACE.
+For live-check versus cached-fd restore behavior, mandatory SACL attributes and full-SACL label constraints, see [The Set-Security Interface](~peios/reference/peios-kernel/kacs/facs/set-security). A full SACL write replaces the entire SACL. A label-only write preserves non-label ACEs; its input is either no SACL, to remove the explicit label, or a SACL containing exactly one non-inherit-only mandatory-label ACE.
 
 ## Pre-flighting an open
 

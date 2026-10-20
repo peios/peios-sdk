@@ -4,7 +4,7 @@ description: The open params struct — desired access, disposition, create opti
 ---
 
 > [!IMPORTANT]
-> The [open-interface comparison](~peios/advanced-peios/peios-kernel/kacs/kacs-abi-notes#open-interface-documentation-discrepancies) records unresolved differences and the [limited pinned-source findings](~peios/advanced-peios/peios-kernel/kacs/kacs-abi-notes#pinned-source-findings) applied here. Creator-SD rejection, the accepted create-option bits, and native-open versus SD-query no-follow behavior were checked in source; the other differences remain unresolved. No runtime test or historical release boundary is established.
+> The [open-interface comparison](~peios/reference/peios-kernel/kacs/kacs-abi-notes#open-interface-documentation-discrepancies) records unresolved differences and the [limited pinned-source findings](~peios/reference/peios-kernel/kacs/kacs-abi-notes#pinned-source-findings) applied here. Creator-SD rejection, the accepted create-option bits, and native-open versus SD-query no-follow behavior were checked in source; the other differences remain unresolved. No runtime test or historical release boundary is established.
 
 ```c
 struct peios_open_params {
@@ -40,7 +40,7 @@ At the pinned kernel revision, supplying a creator SD with `OPEN` fails with
 `EOPNOTSUPP`, and with `OVERWRITE` fails with `EINVAL`. With `OPEN_IF` or
 `OVERWRITE_IF`, it fails with `EINVAL` when the path resolves to an existing
 object. The SDK forwards the disposition and SD; it does not silently drop the
-SD on that branch. See the [source findings](~peios/advanced-peios/peios-kernel/kacs/kacs-abi-notes#pinned-source-findings).
+SD on that branch. See the [source findings](~peios/reference/peios-kernel/kacs/kacs-abi-notes#pinned-source-findings).
 Use create-only when an explicit creator SD is required:
 
 ```c
