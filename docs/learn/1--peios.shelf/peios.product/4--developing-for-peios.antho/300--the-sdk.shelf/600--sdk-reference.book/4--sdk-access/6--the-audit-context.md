@@ -122,3 +122,9 @@ non-`NULL` `audit_context` before they make the syscall. A malformed context
 therefore fails there with `EINVAL`, without reaching the kernel. A non-`NULL`
 pointer with a zero length is refused too, as the kernel refuses it.
 
+## Language bindings
+
+[Audit Contexts in Rust](~peios/sdk-basics/audit-contexts-in-rust) explains
+owned encoding and `AccessDecision` results.
+[Audit Contexts in Go](~peios/sdk-basics/audit-contexts-in-go) uses the
+maintained `access` package and its explicit denial errors.

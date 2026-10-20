@@ -101,6 +101,26 @@ subject has, rather than probing right by right. Clean up the builders
 (`peios_acl_builder_free`, `peios_sd_builder_free`) and the token fd when
 done.
 
+## Intent is not an authorization ticket
+
+For a resource managed by the application, set backup or restore intent only
+when that resource operation actually has the corresponding purpose. The
+subject must still hold the enabled privilege, and the complete pipeline can
+narrow its contribution. The request's intent does not change the token.
+
+A successful advisory check does not grant rights to a later filesystem open,
+write, or descriptor update. Those operations enforce their own contracts.
+Do not implement backup as "pre-check with backup intent, then assume any
+ordinary open is authorized." Use the kernel object's supported operation
+and retain its actual result. Likewise, a prior `WRITE_OWNER` result does
+not eliminate the descriptor-update rules about the new owner SID.
+
+For `MAXIMUM_ALLOWED`, inspect the returned mask rather than treating success
+as a grant of every possible bit. Result-list checks apply object-type-tree
+semantics; they are not a collection of unrelated scalar checks. A caller
+that cannot reproduce local claims, PIP, mapping, or audit context should
+record that gap instead of presenting a rehearsal as the original decision.
+
 ## Per-property checks
 
 If your object has properties or property-sets with their own object ACEs,

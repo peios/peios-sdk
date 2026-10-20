@@ -73,6 +73,37 @@ notes for the SDK caller:
 Enable the specific protections your program can tolerate, verify the call
 succeeded, and prefer to do it before you touch untrusted data.
 
+## Activation and lifecycle
+
+A valid mask can still fail because a platform cannot activate the protection
+or existing mappings violate it. Late WXP, TLP, or LSV requests validate
+existing state; generating incompatible mappings first does not exempt them.
+TLP and LSV inspect file-backed executable mappings, while WXP also constrains
+anonymous executable memory. Plan JIT and library-loading behavior before
+choosing a policy.
+
+Architecture support is part of activation. The maintained kernel refuses
+live CFIF requests with `ENODEV`; CFIB activation is self-only. Having rights
+to another process does not overcome either limitation. SML can be satisfied
+by a platform reporting itself unconditionally unaffected. UI_ACCESS remains
+reserved; do not use the valid-bit mask as a recommended hardening profile.
+
+Fork inherits committed mitigations. Exec preserves them, while recomputing
+PIP from the executable. PIE governs subsequent exec and NO_CHILD governs
+subsequent process creation; neither retroactively changes the running image
+or removes existing children. NO_CHILD permits thread creation and exec.
+
+Handle failures before accepting untrusted work. Read back the committed
+mask and correlate it with the process GUID; a requested mask or an earlier
+process's report is not evidence about a replacement process. Self-targeting
+removes the cross-process authority gates, not input and activation checks.
+A failed request leaves earlier successful commitments intact.
+
+Do not assume a generic service launcher applies a mitigation mask. Verify
+the deployed launcher and the running process. The maintained Peinit launch
+path does not add a per-service mitigation request; inherited flags and
+application self-hardening remain separate.
+
 ## Next
 
 - **[`process.h` reference](~peios/sdk-processes/process-h)** — the call in

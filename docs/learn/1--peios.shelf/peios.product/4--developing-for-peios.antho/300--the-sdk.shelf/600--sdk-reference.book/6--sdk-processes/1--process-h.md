@@ -45,7 +45,7 @@ Three properties define how this call behaves, and each matters:
   returns `-1`.
 
 ```c
-/* Harden the current process: enforce W^X and shadow-stack, refuse to
+/* Harden the current process: enforce W^X and speculation mitigation lock, refuse to
    proceed if either can't be activated. */
 if (peios_process_set_mitigations(-1, KACS_MIT_WXP | KACS_MIT_SML) != 0) {
     perror("set_mitigations");
@@ -97,8 +97,8 @@ if (peios_process_psb(pid, &psb) == 0 && psb.pip_type != 0)
 
 ## See also
 
-- **[`<peios/token.h>`](~peios/sdk-tokens/token-h-tokens-and-sessions)** — PIP
-  dominance is determined by the subject's token; process targeting other than
-  self depends on it.
+- **[`<peios/token.h>`](~peios/sdk-tokens/token-h-tokens-and-sessions)** —
+  Token identity is separate from the caller's PSB-derived PIP.
+  Process targeting can require both identity-based rights and PIP dominance.
 - **[Process mitigations](~kernel/internals/kacs/process-security/psb-fields)** — the
   operator-side account of each mitigation and what it defends against.

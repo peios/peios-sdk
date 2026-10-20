@@ -15,7 +15,7 @@ separate packages and ABI compatibility boundaries. The kernel remains a
 separate project; `vendor/kernel/ORIGIN.json` records the exact source used
 for the SDK's headers and shared semantic crates.
 
-Read the [SDK guides](docs/learn/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/100--sdk-basics.topic/100--what-is-the-peios-sdk.md)
+Read the [SDK guides](docs/learn/1--peios.shelf/peios.product/4--developing-for-peios.antho/300--the-sdk.shelf/100--sdk-basics.topic/100--what-is-the-peios-sdk.md)
 for application development. See [building and testing](docs/building.md)
 for repository work, [implementation ownership](docs/design.md), and
 [ABI maintenance](docs/abi.md) for interface changes.

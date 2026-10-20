@@ -23,7 +23,7 @@ class SourceInputsTests(unittest.TestCase):
             "tools/bazel-vendor.py",
             "build/native-rust.bzl",
             "vendor/kernel/security/core.rs",
-            "docs/learn/peios.product/trail.toml",
+            "docs/learn/1--peios.shelf/peios.product/trail.toml",
         ):
             with self.subTest(source=source):
                 self.assertFalse(CHECK.forbidden_source(source))

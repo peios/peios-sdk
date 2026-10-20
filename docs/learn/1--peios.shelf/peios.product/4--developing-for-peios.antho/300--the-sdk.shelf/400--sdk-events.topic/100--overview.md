@@ -33,8 +33,9 @@ An event has two parts:
 The event type names the kind of event. It's a dotted name made of your
 package name, what the event is about, and what happened, such as
 `org.example.backup.snapshot.created`. Its fields follow one vocabulary shared
-by every emitter on the system. Naming and shaping your
-events shows how to choose both.
+by every emitter on the system.
+[Naming and Shaping Events](~peios/sdk-events/naming-and-shaping-events)
+explains how to choose both.
 
 ## Payloads are MessagePack, and you own them
 
@@ -44,7 +45,8 @@ nesting limits). So userspace owns encoding and decoding, and the SDK ships a
 [MessagePack codec](~peios/sdk-msgpack/msgpack-h-messagepack-codec) whose
 validator's acceptance is matched to the kernel's check. Build a payload with
 the writer, and a successful `peios_mp_writer_bytes` (or `peios_mp_validate`)
-means the emit call will accept it.
+establishes structural validity. Emission still checks size limits,
+permissions, rate limits, and the other requirements of the event interface.
 
 ## Per-CPU rings and lost events
 
@@ -76,9 +78,8 @@ events](~peios/sdk-events/consuming-events).
 
 ## Where to go in this section
 
-- **Naming and shaping your
-  events** — design an event
-  before you emit it: its type, its fields, its tier and its catalog entry.
+- **[Naming and Shaping Events](~peios/sdk-events/naming-and-shaping-events)**
+  — design the type, fields, tier, and catalog entry before emitting it.
 - **[Emitting events](~peios/sdk-events/emitting-events)** — build a payload
   and emit individual events or batches.
 - **[Consuming events](~peios/sdk-events/consuming-events)** — drain the rings

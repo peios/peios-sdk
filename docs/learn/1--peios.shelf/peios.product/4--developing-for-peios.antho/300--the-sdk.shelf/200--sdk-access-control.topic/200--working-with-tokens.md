@@ -195,3 +195,39 @@ kernel injects it.
   every token call in full.
 - **[Impersonation](~kernel/internals/kacs/impersonation/overview)** — the operator-side model
   and its two gates.
+
+## Keep request identity bound to the work
+
+Capture is not a promise of usable impersonation. Query the effective granted
+level after admission: the primary-token identity gate and integrity ceiling
+can reduce it to Identification even when installation succeeds. A restricted
+server cannot escape through an unrestricted same-user client. A privilege
+that satisfies the identity gate does not bypass the integrity ceiling.
+The [kernel admission reference](~kernel/internals/kacs/impersonation/levels-and-admission)
+defines the exact result.
+
+Scope impersonation around the complete client operation and revert on every
+exit path, including errors. Reverting an inner scope does not restore an
+outer impersonation stack; it returns to the primary identity. Keep service
+maintenance outside that client scope. Thread-pool reuse and asynchronous
+migration need explicit handling because impersonation is thread-local.
+
+A pooled connection can carry different senders over time. Connection-level
+capture alone cannot identify every forwarded request. Enable per-message
+identity deliberately, and bind the token returned with a receive to that
+message when consumers can run concurrently. A later peer-token query can
+observe a later received identity. The [transport
+reference](~kernel/internals/kacs/impersonation/transport-and-per-message-identity)
+defines stream boundaries, seqpacket behavior, datagram attachment, and
+unsupported transport cases; ordinary pipes are not peer-token sockets.
+
+A client should verify the server identity returned by peer capture before
+sending sensitive requests. Possession of a familiar socket path is not a
+substitute. Delegation level permits further conveyance where an implemented
+network authentication mechanism supports it; the level alone does not
+supply remote credentials or implement that mechanism.
+
+SDK token opens use close-on-exec descriptors by default. Distinguish that
+handle flag from the thread's impersonation state, which exec reverts.
+Intentionally passing a token handle across exec does not install it as the
+new program's effective identity.
