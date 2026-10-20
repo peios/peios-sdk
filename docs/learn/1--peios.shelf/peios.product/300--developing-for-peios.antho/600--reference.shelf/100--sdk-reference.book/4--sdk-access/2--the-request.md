@@ -37,7 +37,7 @@ struct peios_access_request {
 |---|---|
 | `token_fd` | The subject token to evaluate. **`-1` means the caller's own effective token** — the common case when you are checking access for yourself. Otherwise pass a token fd from [`<peios/token.h>`](~peios/sdk-tokens/token-h-tokens-and-sessions). |
 | `sd` / `sd_len` | The object's security descriptor, as self-relative wire bytes — typically from a [`peios_sd_builder`](~peios/sdk-security/building-security-descriptors) or read off the object. |
-| `desired` | The access mask you want checked. May contain generic bits; the `mapping` resolves them. |
+| `desired` | The access mask you want checked. It can contain generic bits; the `mapping` resolves them. |
 | `mapping` | The object class's generic mapping (a `struct kacs_generic_mapping`), so generic rights in `desired` and in the SD's ACEs fold to the right object-specific bits. Use the class's published table — for example `peios_file_generic_mapping` or `peios_token_generic_mapping`. |
 
 ## The advanced fields
