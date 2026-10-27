@@ -7,14 +7,8 @@ import subprocess
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-RUST_ROOTS = ("libpeios/src", "librsi/src", "peios-cabi/src", "packages")
-SHELL_SOURCES = (
-    "bazel",
-    "tools/check",
-    "tools/offline-build",
-    "libpeios/tools/verify-abi.sh",
-    "librsi/tools/verify-abi.sh",
-)
+RUST_ROOTS = ("libpeios/src", "librsi/src", "peios-cabi/src")
+SHELL_SOURCES = ("tools/check",)
 
 
 def tool(name: str, version: str) -> str:
@@ -47,11 +41,7 @@ def main() -> None:
         str(path.relative_to(ROOT)) for name in RUST_ROOTS for path in (ROOT / name).rglob("*.rs")
     )
     rust.extend(["libpeios/build.rs", "librsi/build.rs", "tools/static-rust-smoke.rs"])
-    python = sorted(
-        str(path.relative_to(ROOT))
-        for name in ("tools", "packages")
-        for path in (ROOT / name).rglob("*.py")
-    )
+    python = sorted(str(path.relative_to(ROOT)) for path in (ROOT / "tools").rglob("*.py"))
     python.append("tools/check-docs")
     run(
         [
@@ -81,8 +71,7 @@ def main() -> None:
             *headers,
         ]
     )
-    data = sorted(str(path.relative_to(ROOT)) for path in (ROOT / "packages").rglob("*.json"))
-    data.extend(str(path.relative_to(ROOT)) for path in (ROOT / ".github").rglob("*.yml"))
+    data = sorted(str(path.relative_to(ROOT)) for path in (ROOT / ".github").rglob("*.yml"))
     if data:
         run([tool("prettier", "3.9.10"), "--config", "tools/prettier.json", "--check", *data])
     ruff = tool("ruff", "0.17.0")

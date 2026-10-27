@@ -75,7 +75,7 @@ The packaged static archives retain linker symbols but omit DWARF debugging
 information. Each library's debug package describes its shared object; it
 does not supply the missing SDK internals for a statically linked program.
 
-To debug statically linked SDK code, use the unstripped `//libpeios:static`
-or `//librsi:static` Bazel output, or rebuild the matching source with its
-recorded compiler and dependency inputs. Keep those inputs with the binary
+To debug statically linked SDK code, use the unstripped archive the SDK's
+build gives, or rebuild the matching source with its recorded compiler and
+dependency inputs. Keep those inputs with the binary
 so that debugger source paths and layouts match the executable.

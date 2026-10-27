@@ -37,10 +37,11 @@ checking two committed headers alone cannot prove they reflect Rust source.
 
 ## Running the checks
 
-Use `//libpeios:abi-test` and `//librsi:abi-test` through Bazel. For a focused
+Run `pekit test libpeios/abi` and `pekit test librsi/abi`. For a focused
 check against explicit outputs, `tools/verify-abi.py` takes a member name
-and required `--shared` and `--static` paths. It never builds an unrequested
-Cargo artifact as a fallback.
+and required `--shared` and `--static` paths, and the compiler and binutils
+in `CC`, `CXX`, `NM`, and `READELF`. It never builds an unrequested Cargo
+artifact as a fallback.
 
 The smoke programs compile and run as C and C++ against each linkage form.
 Keep this executable check alongside header comparison: matching source

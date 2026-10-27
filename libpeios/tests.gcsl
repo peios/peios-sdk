@@ -1,0 +1,21 @@
+# libpeios's checks: its unit tests, and its ABI (see `tools.verify_abi`).
+import toolchain
+import tools
+import Toolchain from toolchain
+import "github.com/gcslib/python"
+import "github.com/gcslib/rust"
+
+def test unit(tests: List<rust.RustTest> = rust.tests(crates(), "libpeios")) {
+    let each = for test in tests { = rust.run_test(test) }
+}
+
+def test abi(
+    shared: File = build libpeios(),
+    static: File = build libpeios_static(),
+    sources: List<{at: String, place: Dir | File}> = tools.abi_sources("libpeios"),
+    cbindgen: File = tools.cbindgen(),
+    c: toolchain.CToolchain = toolchain.get(Toolchain::C),
+    py: python.PythonToolchain = toolchain.get(Toolchain::Python),
+) {
+    = tools.verify_abi("libpeios", "peios", shared, static, sources, cbindgen, c, py)
+}

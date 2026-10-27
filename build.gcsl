@@ -1,0 +1,111 @@
+# The SDK's libraries, libpeios and librsi, each a shared library and a
+# static archive, built one crate at a time (see the rust library's
+# `workspace`), and the headers a program that uses each includes.
+#
+# The SDK is a library as well as a workspace: another workspace imports
+# its definitions, `import build * from "github.com/peios/peios-sdk"`, and
+# builds them from the SDK's own files, at the commit its `pekit.lock`
+# pins.
+import fs
+import toolchain
+import Toolchain from toolchain
+import "github.com/gcslib/python"
+import "github.com/gcslib/rust"
+
+# Every library is linked with full RELRO.
+let HARDENING = ["-Clink-arg=-Wl,-z,relro", "-Clink-arg=-Wl,-z,now"]
+
+# The SDK's workspace, planned. The kernel's crates it vendors read the
+# kernel's sources beside them.
+def crates() -> rust.RustWorkspace {
+    let kernel = [{at = "vendor/kernel"; place = dir("vendor/kernel")}]
+    = rust.workspace(
+        dir("."),
+        rust.vendored(file("Cargo.lock")),
+        rustflags = HARDENING,
+        crates = for each in ["peios-uapi", "kacs-core", "lcs-core"] { = {package = each; data = kernel} },
+    )
+}
+
+# libpeios, `libpeios.so.0` by its soname.
+def build libpeios() {
+    = rust.library(crates(), "libpeios")
+}
+
+# libpeios's static archive, its private Rust runtime renamed so that it
+# links into a program beside another Rust runtime.
+def build libpeios_static() {
+    = isolated(rust.static_library(crates(), "libpeios"), "peios")
+}
+
+# The headers of libpeios: its own, and the kernel's `pkm` ones they include.
+def build libpeios_include() {
+    = include(dir("libpeios/include"), dir("vendor/kernel/include/uapi/pkm"))
+}
+
+# librsi, `librsi.so.0` by its soname.
+def build librsi() {
+    = rust.library(crates(), "librsi")
+}
+
+# librsi's static archive, as libpeios's is.
+def build librsi_static() {
+    = isolated(rust.static_library(crates(), "librsi"), "rsi")
+}
+
+# The headers of librsi: its own, and the kernel's `pkm` ones they include.
+def build librsi_include() {
+    = include(dir("librsi/include"), dir("vendor/kernel/include/uapi/pkm"))
+}
+
+# The archive `archive` with every definition but its `prefix_` API renamed
+# `__lib<prefix>_private_`, by `tools/isolate-static.py`.
+def isolated(archive: File, prefix: String) -> File {
+    = isolate(archive, prefix, file("tools/isolate-static.py"))
+}
+
+# `isolated`'s step: the tool `tool` run on `archive` with the pinned Python
+# and the C toolchain's `nm` and `objcopy`.
+#[hermetic]
+fn isolate(
+    archive: File,
+    prefix: String,
+    tool: File,
+    py: python.PythonToolchain = toolchain.get(Toolchain::Python),
+    c: toolchain.CToolchain = toolchain.get(Toolchain::C),
+) -> File {
+    let placed: List<{at: String, place: Dir | File | FileSet}> = [
+        {at = "/"; place = c.runtime},
+        {at = "/opt/cc"; place = c.root},
+        {at = "/opt/python"; place = py.root},
+        {at = "/work/raw.a"; place = archive},
+        {at = "/work/isolate-static.py"; place = tool},
+    ]
+    let box = fs.compose(placed).sandbox(
+        cwd = "/work",
+        env = {NM = binutil(c, "nm"); OBJCOPY = binutil(c, "objcopy"); PYTHONDONTWRITEBYTECODE = "1"},
+    )
+    let ran = box.exec(python_in(py), "/work/isolate-static.py", "/work/raw.a", "/work/out.a", "--prefix", prefix)
+    let made = working_dir().file("lib{prefix}.a")
+    fs.copy(box.file("/work/out.a").path, made.path)
+    = made
+}
+
+# The headers `own` with the kernel's `pkm` headers at `pkm/` beside them.
+#[hermetic]
+fn include(own: Dir, pkm: Dir) -> Dir {
+    = fs.compose([{at = "."; place = own}, {at = "pkm"; place = pkm}])
+}
+
+# The binutil `name` of the C toolchain `c`, by its path in a sandbox that
+# has the toolchain at `/opt/cc`: `x86_64-linux-nm` beside `x86_64-linux-gcc`.
+def binutil(c: toolchain.CToolchain, name: String): String {
+    let cc = c.cc.path.strip_prefix(c.root.path).strip_prefix("/")
+    = "/opt/cc/{cc.strip_suffix("gcc")}{name}"
+}
+
+# The interpreter of `py`, by its path in a sandbox that has the toolchain
+# at `/opt/python`.
+def python_in(py: python.PythonToolchain): String {
+    = "/opt/python/{py.python.path.strip_prefix(py.root.path).strip_prefix("/")}"
+}

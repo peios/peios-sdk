@@ -1,0 +1,6 @@
+# peios-cabi's unit tests.
+import "github.com/gcslib/rust"
+
+def test unit(tests: List<rust.RustTest> = rust.tests(crates(), "peios-cabi")) {
+    let each = for test in tests { = rust.run_test(test) }
+}

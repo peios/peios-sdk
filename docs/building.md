@@ -1,38 +1,63 @@
 # Building and Testing
 
-Run repository commands from the Peios SDK root. Bazel builds the two C
-libraries, runs tests, and assembles their packages. Cargo remains useful
-for focused Rust development; it does not assemble the package store.
+Use pekit to build the SDK's two C libraries, libpeios and librsi, and to
+run their checks. Pekit builds each crate on its own, so a change rebuilds
+only the crates it reaches. The supported development host is x86-64
+Linux. Cargo remains useful for focused Rust development.
 
-## Development builds
+## Before you start
 
-Use Linux on x86-64 with Python 3.11 or later, GCC, G++, binutils, and a
-working certificate store. The `bazel` launcher selects the version in
-`.bazelversion`; Bazel pins the Rust toolchain and external dependencies.
-Initial dependency acquisition needs network access.
+You need pekit and Git. Everything else is pinned and fetched by pekit on
+the first build: the Bootlin C toolchain, Rust 1.98.1, Python 3.14,
+cbindgen 0.29.2, and the crates `Cargo.lock` selects. The first build needs
+network access; later builds find what they need in pekit's store, and
+every step runs without network access in a sandbox that holds only its
+declared inputs.
 
-Build the shared libraries and static archives:
+The build files use the gcslib libraries named in `workspace.gcsl` and the
+build files. `pekit lock` pins their commits in `pekit.lock`.
 
-```sh
-./bazel build //:artifacts
-```
-
-Build one member with `//libpeios:shared`, `//libpeios:static`,
-`//librsi:shared`, or `//librsi:static`. Use `bazel cquery` when resolving
-configured output paths instead of assuming Cargo's directory layout.
-
-Run the development test suite:
+## Build
 
 ```sh
-./bazel test //...
+pekit build libpeios libpeios_static libpeios_include librsi librsi_static librsi_include
 ```
 
-The member test targets are `//libpeios:tests` and `//librsi:tests`.
-The `//libpeios:abi-test` and `//librsi:abi-test` targets check the exported
-interfaces. ABI verification requires cbindgen 0.29.2, GCC, G++, `nm`, and
-`readelf`; an absent generator is an error, not a skipped freshness check.
-GCC remains the C prototype checker. To use another C++ compiler explicitly,
-pass `--test_env=CXX=/path/to/clang++` to Bazel; the ABI checks report its identity.
+| Target | Output |
+|---|---|
+| `libpeios` | libpeios, `libpeios.so.0` by its shared object name (SONAME) |
+| `libpeios_static` | libpeios's static archive, its private symbols renamed |
+| `libpeios_include` | libpeios's headers, with the kernel's `pkm` headers they include |
+| `librsi` | librsi, `librsi.so.0` by its SONAME |
+| `librsi_static` | librsi's static archive, its private symbols renamed |
+| `librsi_include` | librsi's headers, with the kernel's `pkm` headers they include |
+
+Pekit prints where each output is, under `pekit-out/<target>/`. Each
+library is linked with full RELRO and needs only the C library. One compile
+makes both a library's shared object and its archive, as Cargo's does.
+
+## Test
+
+```sh
+pekit test
+```
+
+| Test | Check |
+|---|---|
+| `libpeios/unit`, `librsi/unit`, `peios-cabi/unit` | Each member's unit tests |
+| `libpeios/abi`, `librsi/abi` | The library's ABI, as `tools/verify-abi.py` checks it |
+| `tools/static_runtime` | Both archives linked into Rust programs, with unwinding and aborting |
+| `tools/kernel_inputs` | The files under `vendor/kernel` are exactly those `ORIGIN.json` lists |
+| `tools/verify_abi_tool` | `verify-abi.py`'s own unit tests |
+| `tools/update_kernel_inputs_tool` | `update-kernel-inputs.py`'s own unit tests |
+
+A test whose inputs did not change is found in the store and not run
+again. `tools/update_kernel_inputs_tool` makes Git repositories, so it runs
+on the host with the host's `git` and Python, every time.
+
+The ABI checks build cbindgen 0.29.2 from its crates.io source and run with
+the Bootlin toolchain's GCC, G++, `nm`, and `readelf`. See [ABI
+maintenance](abi.md) for what they check.
 
 ## Style and repository checks
 
@@ -42,97 +67,61 @@ The repository's complete check entry point is:
 tools/check
 ```
 
-Use the pinned tools prepared by `tools/prepare-style-tools.py` for source
-formatting. The PSC baseline lives in Panorama; the SDK's checked-in tool
-configuration makes its mechanical rules reproducible.
+It checks formatting with the pinned tools prepared by
+`tools/prepare-style-tools.py`, checks the vendored kernel files, builds
+the libraries and runs the tests with pekit, and runs Cargo's lints and
+documentation tests. The PSC baseline lives in Panorama; the SDK's
+checked-in tool configuration makes its mechanical rules reproducible.
 
 For a focused Rust iteration, the workspace includes libpeios, librsi, and
 peios-cabi. Keep `Cargo.lock` in sync with deliberate dependency changes.
 Do not modify the kernel-owned code under `vendor/kernel/` to satisfy an
 SDK style check.
 
-## Package assembly
+## Building against the SDK
 
-Build the content-addressed package store:
+The SDK is a GCSL library as well as a workspace. Another workspace builds
+the SDK's libraries from the SDK's own files by importing its definitions:
 
-```sh
-./bazel build //:packages
+```text
+import build * from "github.com/peios/peios-sdk"
+
+def build program() { ... build libpeios() ... build libpeios_include() ... }
 ```
 
-Each public library retains its runtime, development, static, debugging,
-and debug-source package identities. `dev.peios.peios-sdk-source` contains
-the consolidated source. `peios-cabi` is internal code linked into the
-public libraries; it is not a third public shared library.
-
-Package manifests and blobs are assembled by the pinned canonical writer.
-Package validation and native hardening checks are separate from ordinary
-source tests. Development artifacts are not signed release artifacts.
+`pekit lock` pins the SDK's commit in that workspace's `pekit.lock`, as it
+pins any library. A program built with Rust binds libpeios through
+peios-rs, whose library gives `peios-sys` the SDK's library and headers.
 
 ## Static consumers
 
-The Bazel static targets namespace private implementation and Rust runtime
-symbols. This lets a Rust executable link the C ABI archive without conflicting
-with its own allocator or panic runtime; it also lets both SDK archives coexist.
-Public `peios_*` and `rsi_*` names and undefined system-library imports retain
-their names. The shared libraries are unchanged.
+The static targets namespace private implementation and Rust runtime
+symbols, with `tools/isolate-static.py`. This lets a Rust executable link
+the C ABI archive without conflicting with its own allocator or panic
+runtime; it also lets both SDK archives coexist. Public `peios_*` and
+`rsi_*` names and undefined system-library imports retain their names. The
+shared libraries are unchanged.
 
-Use the completed `//libpeios:static` and `//librsi:static` outputs for consumers.
-Cargo's compiler output is an intermediate archive; if using that development
-path, finish it explicitly before linking it into a Rust application:
+Use the `libpeios_static` and `librsi_static` outputs for consumers.
+Cargo's compiler output is an intermediate archive; if using that
+development path, finish it explicitly before linking it into a Rust
+application:
 
 ```sh
 python3 tools/isolate-static.py target/release/libpeios.a /tmp/libpeios.a --prefix peios
 ```
 
-The `//:static-runtime-test` check links both archives into Rust executables
-with unwind and abort panic strategies and exercises userspace parsing.
-It does not invoke Peios kernel operations.
+The `tools/static_runtime` test links both archives into Rust executables
+with unwind and abort panic strategies and exercises userspace parsing. It
+does not invoke Peios kernel operations.
 
-For a self-contained musl executable, build a matching archive instead of
-reusing the GNU-libc archive:
+## Not built with pekit yet
 
-```sh
-./bazel build --config=musl //libpeios:static
-```
-
-In a compatible Peios build environment, combine `--config=peios` and
-`--config=musl` to use the installed hardened musl standard library. This
-configuration supports the static archive needed by early-boot consumers;
-it does not define a separate musl SDK package family.
-
-## Static debugging
-
-Packaged static archives have DWARF information removed while retaining
-linker symbols. Per-library debug packages describe the shared objects and
-cannot restore SDK debug information in a statically linked executable.
-Use the unstripped `//libpeios:static` or `//librsi:static` Bazel output for
-static debugging, or rebuild the matching source and compiler inputs.
-
-## Native builds and offline inputs
-
-The `peios` Bazel configuration selects the installed Peios Rust compiler
-and hardened standard library. Set `PEIOS_RUSTC` when that compiler is not
-`/usr/bin/rustc`. Use a compatible Peios userspace, compiler runtime, and
-linker; setting `--config=peios` on an unrelated host is not a substitute.
-
-`tools/offline-build` separates acquisition from use of a frozen dependency
-snapshot. Its operations are:
-
-| Operation | Inputs | Effect |
-|---|---|---|
-| `acquire` | New absolute snapshot directory | Acquires host and native-selected dependencies, freezes repositories, and records the module lock |
-| `build` | Snapshot and private absolute work directory | Builds native packages and targets with downloads forbidden |
-| `test` | Snapshot and private absolute work directory | Runs native package and test targets with downloads forbidden |
-
-Acquire outside the isolated native environment. Run `build` or `test`
-inside the prepared native environment with the snapshot available. The
-helper rejects a module lock that differs from the recorded snapshot.
-It does not create a virtual machine or install packages into a live system.
-
-For reproducibility checks, build the same frozen source in separate
-output roots. Compare the unstripped shared libraries and archives as well
-as package payloads. Preserve compiler, dependency, and source identities
-with the results.
+Packages, builds with the native Peios toolchain, which hardens the
+libraries with control-flow enforcement technology (CET), and musl archives
+for early-boot consumers are not yet built with pekit. The package
+definitions, the packaging pipeline, and the native and musl build settings
+from the Bazel build are kept outside this repository until they are.
 
 ## Documentation checks
 

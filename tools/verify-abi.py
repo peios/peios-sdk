@@ -2,7 +2,8 @@
 """Verify SDK source, shipped headers and explicit shared/static build outputs.
 
 Host requirements: Python 3.11+, cbindgen 0.29.2, GCC, a C++ compiler, nm and readelf.
-CXX selects an explicit C++ compiler executable; the default is g++.
+CC, CXX, NM and READELF select explicit executables; the defaults are gcc,
+g++, nm and readelf.
 No check is optional. Kernel headers come only from the committed source pin.
 """
 
@@ -20,6 +21,9 @@ from dataclasses import dataclass
 from pathlib import Path
 
 CBINDGEN_VERSION = "cbindgen 0.29.2"
+CC = os.environ.get("CC", "gcc")
+NM = os.environ.get("NM", "nm")
+READELF = os.environ.get("READELF", "readelf")
 CXX = os.environ.get("CXX", "g++")
 ROOT = Path(os.path.abspath(__file__)).parent.parent
 
@@ -75,7 +79,7 @@ def lines(values: list[str] | set[str]) -> str:
 
 
 def check_tools() -> None:
-    for tool in ("cbindgen", "gcc", CXX, "nm", "readelf"):
+    for tool in ("cbindgen", CC, CXX, NM, READELF):
         if shutil.which(tool) is None:
             raise VerificationError(f"required host tool missing: {tool}")
     cpp_version = run([CXX, "--version"]).splitlines()
@@ -110,7 +114,7 @@ def translation_unit(header: Path) -> str:
 
 
 def check_headers(library: Library, includes: list[str]) -> None:
-    for compiler, language in (("gcc", "c"), (CXX, "c++")):
+    for compiler, language in ((CC, "c"), (CXX, "c++")):
         for header in [library.snapshot, *library.headers]:
             run([compiler, *includes, "-Werror", "-fsyntax-only", "-x", language, str(header)])
     print(f"ok: {len(library.headers)} shipping headers and snapshot compile in C and C++")
@@ -128,7 +132,7 @@ def normalize_function(prototype: str) -> str:
 
 def functions(source: Path, prefix: str, includes: list[str]) -> set[str]:
     auxiliary = source.with_suffix(".aux")
-    run(["gcc", *includes, "-aux-info", str(auxiliary), "-c", "-o", os.devnull, str(source)])
+    run([CC, *includes, "-aux-info", str(auxiliary), "-c", "-o", os.devnull, str(source)])
     pattern = rf"\b{prefix}_[a-z_]+\s*\("
     return {
         normalize_function(line)
@@ -186,7 +190,7 @@ def layout(
 ) -> str:
     source.write_text(layout_source(header, structs, snapshot=snapshot))
     binary = source.with_suffix("")
-    run(["gcc", *includes, "-Werror", str(source), "-o", str(binary)])
+    run([CC, *includes, "-Werror", str(source), "-o", str(binary)])
     return lines(run([str(binary)]).splitlines())
 
 
@@ -243,14 +247,14 @@ def checked_symbols(library: Library, temporary: Path, includes: list[str]) -> s
 
 
 def check_binary(library: Library, expected: set[str]) -> str:
-    dynamic = run(["readelf", "-dW", str(library.shared)])
+    dynamic = run([READELF, "-dW", str(library.shared)])
     needed = set(re.findall(r"\(NEEDED\).*?\[(.*?)\]", dynamic))
     if library.member == "librsi":
         equal(lines(needed), "libc.so.6\n", "librsi must depend only on libc")
     exported = {
         line.split()[0]
         for line in run(
-            ["nm", "-D", "--defined-only", "--format=posix", str(library.shared)]
+            [NM, "-D", "--defined-only", "--format=posix", str(library.shared)]
         ).splitlines()
         if line.strip()
     }
@@ -269,7 +273,7 @@ def smoke(library: Library, temporary: Path, includes: list[str], soname: str) -
     (runtime / soname).symlink_to(library.shared)
     environment = dict(os.environ, LD_LIBRARY_PATH=str(runtime))
     source = library.root / "tools/package-smoke.c"
-    for compiler, language in (("gcc", "c"), (CXX, "c++")):
+    for compiler, language in ((CC, "c"), (CXX, "c++")):
         for linkage, archive in (("shared", library.shared), ("static", library.static)):
             binary = temporary / f"smoke-{language}-{linkage}"
             run(

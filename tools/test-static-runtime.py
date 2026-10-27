@@ -12,6 +12,8 @@ def main() -> None:
     """Check debug/unwind and optimized/abort consumer configurations."""
     peios, rsi = (Path(value).resolve() for value in sys.argv[1:])
     source = Path(__file__).with_name("static-rust-smoke.rs")
+    # CC, if set, links the programs, as Cargo's linker setting would.
+    linker = ["-C", "linker=" + os.environ["CC"]] if os.environ.get("CC") else []
     with tempfile.TemporaryDirectory(prefix="peios-rust-static-") as directory:
         for panic, optimization in (("unwind", "0"), ("abort", "2")):
             binary = Path(directory) / panic
@@ -30,6 +32,7 @@ def main() -> None:
                     "link-arg=" + str(rsi),
                     "-o",
                     str(binary),
+                    *linker,
                 ],
                 check=True,
             )
