@@ -1,0 +1,187 @@
+# The checks of the SDK's tools, and what the members' checks share: the
+# ABI check each library runs, and the cbindgen it compares their headers
+# with.
+import archive
+import fs
+import toolchain
+import Toolchain from toolchain
+import "github.com/gcslib/python"
+import "github.com/gcslib/rust"
+
+# cbindgen 0.29.2, the one `verify-abi.py` takes, built from its crates.io
+# source with its own lock.
+def cbindgen() -> File {
+    let crate = fetch(
+        "https://static.crates.io/crates/cbindgen/cbindgen-0.29.2.crate",
+        sha256 = "befbfd072a8e81c02f8c507aefce431fe5e7d051f83d48a23ffc9b9fe5a11799",
+    )
+    let src = archive.unpack(crate, strip = 1)
+    = rust.bin(rust.workspace(src, rust.vendored(src.file("Cargo.lock"))), "cbindgen")
+}
+
+# What the ABI check of the library `member` reads of the SDK's files: the
+# library's directory, the kernel's headers and the checker.
+def abi_sources(member: String) -> List<{at: String, place: Dir | File}> {
+    = [
+        {at = "/work/src/{member}"; place = dir("../{member}")},
+        {at = "/work/src/vendor/kernel/include"; place = dir("../vendor/kernel/include")},
+        {at = "/work/src/tools/verify-abi.py"; place = file("verify-abi.py")},
+    ]
+}
+
+# The library `member`'s ABI, as `verify-abi.py` checks it, given its
+# shared library `shared` and static archive `static`, its `sources`
+# (`abi_sources`), and `cbindgen`: its committed snapshot what cbindgen
+# makes of its source, its headers compiling as C and C++ and declaring
+# what its Rust exports, each layout the same in both, its shared library
+# exporting exactly the headers' functions and needing only libc, and a C
+# program linking each library.
+#[hermetic]
+def verify_abi(
+    member: String,
+    prefix: String,
+    shared: File,
+    static: File,
+    sources: List<{at: String, place: Dir | File}>,
+    cbindgen: File,
+    c: toolchain.CToolchain = toolchain.get(Toolchain::C),
+    py: python.PythonToolchain = toolchain.get(Toolchain::Python),
+) -> {} {
+    let placed: List<{at: String, place: Dir | File | FileSet}> = [
+        {at = "/"; place = c.runtime},
+        {at = "/tmp"; place = working_dir().dir("tmp")},
+        {at = "/opt/cc"; place = c.root},
+        {at = "/opt/python"; place = py.root},
+        {at = "/opt/cbindgen/cbindgen"; place = cbindgen},
+        {at = "/work/lib/lib{prefix}.so"; place = shared},
+        {at = "/work/lib/lib{prefix}.a"; place = static},
+        ...(for each in sources { = {at = each.at; place = each.place} }),
+    ]
+    let made = fs.mkdir(working_dir().dir("tmp").path)
+    let box = fs.compose(placed).sandbox(
+        cwd = "/work/src",
+        env = {
+            CC = binutil(c, "gcc")
+            CXX = binutil(c, "g++")
+            NM = binutil(c, "nm")
+            READELF = binutil(c, "readelf")
+            PATH = "/opt/cbindgen:/opt/cc/bin:/usr/bin:/bin"
+            PYTHONDONTWRITEBYTECODE = "1"
+            TMPDIR = "/tmp"
+        },
+    )
+    let ran = box.exec(
+        python_in(py),
+        "/work/src/tools/verify-abi.py",
+        member,
+        "--shared",
+        "/work/lib/lib{prefix}.so",
+        "--static",
+        "/work/lib/lib{prefix}.a",
+        panic = false,
+    )
+    if ran.status != 0 {
+        panic("the ABI check of `{member}` failed:\n{ran.stdout}{ran.stderr}")
+    }
+}
+
+# Both static archives linked into one Rust program, built with unwinding
+# and without optimisation and with aborting and with it, each run: the two
+# Rust runtimes they hold must not clash with the program's.
+def test static_runtime(
+    peios: File = build libpeios_static(),
+    rsi: File = build librsi_static(),
+    sources: List<{at: String, place: Dir | File}> = [
+        {at = "/work/test-static-runtime.py"; place = file("test-static-runtime.py")},
+        {at = "/work/static-rust-smoke.rs"; place = file("static-rust-smoke.rs")},
+    ],
+    c: toolchain.CToolchain = toolchain.get(Toolchain::C),
+    rust: rust.RustToolchain = toolchain.get(Toolchain::Rust),
+    py: python.PythonToolchain = toolchain.get(Toolchain::Python),
+) {
+    let made = fs.mkdir(working_dir().dir("tmp").path)
+    let placed: List<{at: String, place: Dir | File | FileSet}> = [
+        {at = "/"; place = c.runtime},
+        {at = "/tmp"; place = working_dir().dir("tmp")},
+        {at = "/opt/cc"; place = c.root},
+        {at = "/opt/rust"; place = rust.root},
+        {at = "/opt/python"; place = py.root},
+        {at = "/work/libpeios.a"; place = peios},
+        {at = "/work/librsi.a"; place = rsi},
+        ...(for each in sources { = {at = each.at; place = each.place} }),
+    ]
+    let box = fs.compose(placed).sandbox(
+        cwd = "/work",
+        env = {
+            CC = binutil(c, "gcc")
+            RUSTC = "/opt/rust/bin/rustc"
+            PATH = "/opt/cc/bin:/usr/bin:/bin"
+            PYTHONDONTWRITEBYTECODE = "1"
+            TMPDIR = "/tmp"
+        },
+    )
+    let ran = box.exec(python_in(py), "/work/test-static-runtime.py", "/work/libpeios.a", "/work/librsi.a", panic = false)
+    if ran.status != 0 {
+        panic("the static archives failed in a Rust program:\n{ran.stdout}{ran.stderr}")
+    }
+}
+
+# `verify-abi.py`'s own unit tests, which compile layout probes with the C
+# toolchain.
+def test verify_abi_tool(
+    sources: List<{at: String, place: Dir | File}> = [
+        {at = "/work/tools/verify-abi.py"; place = file("verify-abi.py")},
+        {at = "/work/tools/test-verify-abi.py"; place = file("test-verify-abi.py")},
+    ],
+    c: toolchain.CToolchain = toolchain.get(Toolchain::C),
+    py: python.PythonToolchain = toolchain.get(Toolchain::Python),
+) {
+    let made = fs.mkdir(working_dir().dir("tmp").path)
+    let placed: List<{at: String, place: Dir | File | FileSet}> = [
+        {at = "/"; place = c.runtime},
+        {at = "/tmp"; place = working_dir().dir("tmp")},
+        {at = "/opt/cc"; place = c.root},
+        {at = "/opt/python"; place = py.root},
+        ...(for each in sources { = {at = each.at; place = each.place} }),
+    ]
+    let box = fs.compose(placed).sandbox(
+        cwd = "/work",
+        env = {CC = binutil(c, "gcc"); PYTHONDONTWRITEBYTECODE = "1"; TMPDIR = "/tmp"},
+    )
+    let ran = box.exec(python_in(py), "/work/tools/test-verify-abi.py", panic = false)
+    if ran.status != 0 {
+        panic("`verify-abi.py`'s tests failed:\n{ran.stdout}{ran.stderr}")
+    }
+}
+
+# The kernel's files vendored under `vendor/kernel`: exactly those its
+# `ORIGIN.json` lists, each with its digest and mode.
+def test kernel_inputs(
+    sources: List<{at: String, place: Dir | File}> = [
+        {at = "/work/tools/update-kernel-inputs.py"; place = file("update-kernel-inputs.py")},
+        {at = "/work/vendor/kernel"; place = dir("../vendor/kernel")},
+    ],
+    py: python.PythonToolchain = toolchain.get(Toolchain::Python),
+) {
+    let made = fs.mkdir(working_dir().dir("tmp").path)
+    let placed: List<{at: String, place: Dir | File | FileSet}> = [
+        {at = "/"; place = py.runtime},
+        {at = "/opt/python"; place = py.root},
+        ...(for each in sources { = {at = each.at; place = each.place} }),
+    ]
+    let box = fs.compose(placed).sandbox(cwd = "/work", env = {PYTHONDONTWRITEBYTECODE = "1"})
+    let ran = box.exec(python_in(py), "/work/tools/update-kernel-inputs.py", "check", "--snapshot", "/work/vendor/kernel", panic = false)
+    if ran.status != 0 {
+        panic("the vendored kernel files differ from their origin:\n{ran.stdout}{ran.stderr}")
+    }
+}
+
+# `update-kernel-inputs.py`'s own unit tests, which make git repositories,
+# so that they run with the host's `git` and Python.
+#[hermetic(false)]
+def test update_kernel_inputs_tool() {
+    let ran = exec(["python3", file("test_update_kernel_inputs.py").path], env = {PYTHONDONTWRITEBYTECODE = "1"}, panic = false)
+    if ran.status != 0 {
+        panic("the kernel-input updater's tests failed:\n{ran.stdout}{ran.stderr}")
+    }
+}

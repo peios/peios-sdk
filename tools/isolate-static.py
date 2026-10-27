@@ -2,15 +2,20 @@
 """Namespace private archive definitions so Rust and C runtimes can coexist."""
 
 import argparse
+import os
 import subprocess
 import tempfile
 from pathlib import Path
+
+# NM and OBJCOPY, if set, name the binutils to run.
+NM = os.environ.get("NM", "nm")
+OBJCOPY = os.environ.get("OBJCOPY", "objcopy")
 
 
 def defined_symbols(archive: Path) -> set[str]:
     """Read global definitions without demangling their linker names."""
     result = subprocess.run(
-        ["nm", "-g", "--defined-only", "--format=posix", str(archive)],
+        [NM, "-g", "--defined-only", "--format=posix", str(archive)],
         check=True,
         capture_output=True,
         text=True,
@@ -38,7 +43,7 @@ def isolate(source: Path, output: Path, prefix: str) -> None:
             "".join(f"{symbol} {namespace}{symbol}\n" for symbol in sorted(symbols - public))
         )
         subprocess.run(
-            ["objcopy", "--redefine-syms=" + str(mapping), str(source), str(output)], check=True
+            [OBJCOPY, "--redefine-syms=" + str(mapping), str(source), str(output)], check=True
         )
     expected = public | {namespace + symbol for symbol in symbols - public}
     if defined_symbols(output) != expected:

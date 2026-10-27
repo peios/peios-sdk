@@ -1,0 +1,21 @@
+# librsi's checks: its unit tests, and its ABI (see `tools.verify_abi`).
+import toolchain
+import tools
+import Toolchain from toolchain
+import "github.com/gcslib/python"
+import "github.com/gcslib/rust"
+
+def test unit(tests: List<rust.RustTest> = rust.tests(crates(), "librsi")) {
+    let each = for test in tests { = rust.run_test(test) }
+}
+
+def test abi(
+    shared: File = build librsi(),
+    static: File = build librsi_static(),
+    sources: List<{at: String, place: Dir | File}> = tools.abi_sources("librsi"),
+    cbindgen: File = tools.cbindgen(),
+    c: toolchain.CToolchain = toolchain.get(Toolchain::C),
+    py: python.PythonToolchain = toolchain.get(Toolchain::Python),
+) {
+    = tools.verify_abi("librsi", "rsi", shared, static, sources, cbindgen, c, py)
+}
