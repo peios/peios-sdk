@@ -1,6 +1,8 @@
 /target/
-/bazel-*
-/.ci-*/
 /out/
 **/__pycache__/
 **/.ruff_cache/
+
+# pekit build output, and the libraries pekit lock exports.
+/pekit-out/
+/.gcsl/
