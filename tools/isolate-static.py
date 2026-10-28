@@ -42,8 +42,17 @@ def isolate(source: Path, output: Path, prefix: str) -> None:
         mapping.write_text(
             "".join(f"{symbol} {namespace}{symbol}\n" for symbol in sorted(symbols - public))
         )
+        # Deterministic archive headers: zero timestamps, owners and modes, as
+        # not every toolchain's objcopy writes by default.
         subprocess.run(
-            [OBJCOPY, "--redefine-syms=" + str(mapping), str(source), str(output)], check=True
+            [
+                OBJCOPY,
+                "--enable-deterministic-archives",
+                "--redefine-syms=" + str(mapping),
+                str(source),
+                str(output),
+            ],
+            check=True,
         )
     expected = public | {namespace + symbol for symbol in symbols - public}
     if defined_symbols(output) != expected:
