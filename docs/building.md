@@ -20,13 +20,14 @@ build files. `pekit lock` pins their commits in `pekit.lock`.
 ## Build
 
 ```sh
-pekit build libpeios libpeios_static libpeios_include librsi librsi_static librsi_include
+pekit build libpeios libpeios_static libpeios_static_musl libpeios_include librsi librsi_static librsi_include
 ```
 
 | Target | Output |
 |---|---|
 | `libpeios` | libpeios, `libpeios.so.0` by its shared object name (SONAME) |
 | `libpeios_static` | libpeios's static archive, its private symbols renamed |
+| `libpeios_static_musl` | libpeios's static archive for `x86_64-unknown-linux-musl`, its private symbols renamed |
 | `libpeios_include` | libpeios's headers, with the kernel's `pkm` headers they include |
 | `librsi` | librsi, `librsi.so.0` by its SONAME |
 | `librsi_static` | librsi's static archive, its private symbols renamed |
@@ -102,7 +103,8 @@ runtime; it also lets both SDK archives coexist. Public `peios_*` and
 `rsi_*` names and undefined system-library imports retain their names. The
 shared libraries are unchanged.
 
-Use the `libpeios_static` and `librsi_static` outputs for consumers.
+Use the `libpeios_static` and `librsi_static` outputs for consumers, and
+`libpeios_static_musl` for a static musl program.
 Cargo's compiler output is an intermediate archive; if using that
 development path, finish it explicitly before linking it into a Rust
 application:

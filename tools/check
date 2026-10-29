@@ -6,7 +6,7 @@ repo=$(CDPATH="" cd -- "$(dirname -- "$0")/.." && pwd)
 cd "$repo"
 python3 tools/style-check.py
 python3 tools/update-kernel-inputs.py check
-pekit build libpeios libpeios_static libpeios_include librsi librsi_static librsi_include
+pekit build libpeios libpeios_static libpeios_static_musl libpeios_include librsi librsi_static librsi_include
 pekit test
 cargo +1.98.1 clippy --no-deps -p libpeios -p librsi -p peios-cabi --all-targets --locked -- -D warnings
 cargo +1.98.1 test --workspace --doc --locked
