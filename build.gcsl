@@ -15,13 +15,14 @@ import "github.com/gcslib/rust"
 # Every library is linked with full RELRO.
 let HARDENING = ["-Clink-arg=-Wl,-z,relro", "-Clink-arg=-Wl,-z,now"]
 
-# The SDK's workspace, planned. The kernel's crates it vendors read the
-# kernel's sources beside them.
-def crates() -> rust.RustWorkspace {
+# The SDK's workspace, planned for `target`. The kernel's crates it vendors
+# read the kernel's sources beside them.
+def crates(target: String = "x86_64-unknown-linux-gnu") -> rust.RustWorkspace {
     let kernel = [{at = "vendor/kernel"; place = dir("vendor/kernel")}]
     = rust.workspace(
         dir("."),
         rust.vendored(file("Cargo.lock")),
+        target = target,
         rustflags = HARDENING,
         crates = for each in ["peios-uapi", "kacs-core", "lcs-core"] { = {package = each; data = kernel} },
     )
@@ -36,6 +37,12 @@ def build libpeios() {
 # links into a program beside another Rust runtime.
 def build libpeios_static() {
     = isolated(rust.static_library(crates(), "libpeios"), "peios")
+}
+
+# libpeios's static archive for musl, isolated as the glibc one is, which a
+# static musl program links.
+def build libpeios_static_musl() {
+    = isolated(rust.static_library(crates(target = "x86_64-unknown-linux-musl"), "libpeios"), "peios")
 }
 
 # The headers of libpeios: its own, and the kernel's `pkm` ones they include.
